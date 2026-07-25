@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # ─── Configuration ────────────────────────────────────────────────────────────
-LLVM_BRANCH="${LLVM_BRANCH:-llvmorg-22.1.0}"
+LLVM_BRANCH="${LLVM_BRANCH:-llvmorg-22.1.8}"
 LLVM_SOURCE="${LLVM_SOURCE:-upstream}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/toolchains/oronyx}"
 BUILD_DIR="${BUILD_DIR:-$(pwd)/build}"

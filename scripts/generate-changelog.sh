@@ -3,7 +3,7 @@
 # Usage: bash scripts/generate-changelog.sh [from_tag] [to_tag]
 set -euo pipefail
 
-REPO="naidrahiqa/Oronyx_Clang"
+REPO="${GITHUB_REPOSITORY:-naidrahiqa/Oronyx_Clang}"
 FROM_TAG="${1:-}"
 TO_TAG="${2:-HEAD}"
 

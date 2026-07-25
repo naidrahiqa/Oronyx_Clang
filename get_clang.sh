@@ -47,10 +47,10 @@ ok "All dependencies found"
 info 2 "Fetching latest release URL ..."
 LATEST_URL=""
 
-# Preferred: source get_latest_url.sh from repo (only var assignments, safe)
+# Preferred: read get_latest_url.sh from repo (only var assignments, safe)
 URL_SCRIPT=$(curl -sL "$BASE_URL/get_latest_url.sh" 2>/dev/null || true)
 if [[ -n "$URL_SCRIPT" ]]; then
-  eval "$(echo "$URL_SCRIPT" | grep -E '^LATEST_URL=' || true)"
+  LATEST_URL=$(echo "$URL_SCRIPT" | grep -E '^LATEST_URL=' | head -1 | cut -d= -f2- | tr -d '"' || true)
 fi
 
 # Fallback 1: read latest.txt from repo

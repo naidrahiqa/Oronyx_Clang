@@ -344,86 +344,45 @@ $(fmt_section)
   release)
     RELEASE_URL="https://github.com/$REPO/releases/tag/$RELEASE_TAG"
     ORONYX_VER="${RELEASE_TAG#oronyx-}"
-    PGO_STR="✅ Enabled"
-    [[ "$ENABLE_PGO" == "false" ]] && PGO_STR="❌ Disabled"
-    BOLT_STR="✅"
-    [[ "$ENABLE_BOLT" != "true" ]] && BOLT_STR="❌"
-
+    
+    # Get LLVM commit info
+    LLVM_COMMIT_HASH="${LLVM_COMMIT:-unknown}"
+    LLVM_COMMIT_MSG="${LLVM_COMMIT_MSG:-Automated build}"
+    
     MSG="$(fmt_header "Oronyx Clang $ORONYX_VER Released")"
     MSG="$MSG
-📅 Update:$(date -u +%d/%m/%y)"
+Clang version: <code>$CLANG_VERSION</code>"
     MSG="$MSG
-🔧 Version: <code>$ORONYX_VER</code>"
+LLVM repo commit: $LLVM_COMMIT_MSG"
     MSG="$MSG
-🎯 Target: <code>$TARGETS</code>"
-    MSG="$MSG
-👤 By:@$(echo "$REPO" | cut -d/ -f2)"
+Link: <a href=\"https://github.com/llvm/llvm-project/commit/$LLVM_COMMIT_HASH\"><code>${LLVM_COMMIT_HASH:0:7}</code></a>"
     MSG="$MSG
 $(fmt_section)
-📋 <b>Changelog:</b>"
+<b>Installation</b>"
     MSG="$MSG
-• LLVM <code>$LLVM_BRANCH</code>"
-    MSG="$MSG
-• PGO: $PGO_STR"
-    MSG="$MSG
-• ThinLTO: $LTO_MODE"
-    MSG="$MSG
-• BOLT: $BOLT_STR"
-    MSG="$MSG
-• Polly Loop Optimizer"
-    MSG="$MSG
-• Kernel 4.14+ to 6.x+ Support"
-    MSG="$MSG
-• ThinLTO for Kernel 5.12+"
-    MSG="$MSG
-• Bundled libc++/libc++abi"
-    MSG="$MSG
-• and others"
+<pre><code>bash &lt;(wget -qO- https://raw.githubusercontent.com/naidrahiqa/Oronyx_Clang/main/get_clang.sh)</code></pre>"
     MSG="$MSG
 $(fmt_section)
-📦 <b>Download</b> (<a href=\"$RELEASE_URL\">GitHub Release</a>)"
+<b>Features</b>"
     MSG="$MSG
-📦 File: <code>$TARBALL_NAME</code>"
+• PGO (Profile-Guided Optimization)"
     MSG="$MSG
-📦 Size: <code>$PACKAGE_SIZE</code>"
+• ThinLTO / FullLTO"
     MSG="$MSG
-$(fmt_section)
-🙏 <b>Credits:</b>"
+• BOLT post-build optimization"
     MSG="$MSG
-@llvm-project — LLVM/Clang source"
+• Polly loop optimizer"
     MSG="$MSG
-@AOSP — Android kernel compatibility"
+• Kernel 4.14+ support"
     MSG="$MSG
-$(fmt_section)
-📢 <b>Follow my Channel</b> (<a href=\"https://t.me/naidrahiqa\">@naidrahiqa</a>)"
-    MSG="$MSG
-💬 <b>Join support group</b> (<a href=\"https://t.me/bwabwabwa_discus\">@bwabwabwa_discus</a>)"
+• AArch64 / ARM targets"
     MSG="$MSG
 $(fmt_section)
-#OronyxClang #LLVM #Clang #Toolchain #AndroidKernel #AArch64 #ARM #ThinLTO #PGO #BOLT"
+📦 <code>$TARBALL_NAME</code> (<code>$PACKAGE_SIZE</code>)"
+    MSG="$MSG
+$(fmt_section)
+<a href=\"$RELEASE_URL\">GitHub Release</a>"
     send_msg "$MSG"
     ;;
 
-  release_old)
-    RELEASE_URL="https://github.com/$REPO/releases/tag/$RELEASE_TAG"
-    MSG="$(fmt_header "Oronyx Clang $RELEASE_TAG Released")"
-    MSG="$MSG
-✅ <b>Release published successfully!</b>"
-    MSG="$MSG
-$(fmt_section)
-📦 <b>Release Info:</b>"
-    MSG="$MSG
-📦 Tag: $RELEASE_TAG"
-    MSG="$MSG
-📦 File: ${TARBALL_NAME:-unknown}"
-    MSG="$MSG
-📦 Size: ${PACKAGE_SIZE:-unknown}"
-    MSG="$MSG
-$(fmt_section)
-🚀 <b>Quick Download:</b>
-<pre><code>wget $RELEASE_URL/download/$RELEASE_TAG/${TARBALL_NAME:-oronyx-clang.tar.zst}</code></pre>"
-    MSG="$MSG
-🔗 <a href=\"$RELEASE_URL\">View Release</a>"
-    send_msg "$MSG"
-    ;;
 esac

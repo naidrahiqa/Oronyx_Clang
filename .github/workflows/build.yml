@@ -303,32 +303,64 @@ jobs:
         run: |
           TARBALL="${{ steps.package.outputs.TARBALL }}"
           
-          # Generate changelog
-          CHANGELOG=$(bash scripts/generate-changelog.sh "" "$RELEASE_TAG" 2>/dev/null || echo "Automated build for $RELEASE_TAG")
+          # Get LLVM commit info
+          LLVM_COMMIT_HASH=$(git -C "$LLVM_DIR" rev-parse HEAD 2>/dev/null || echo "unknown")
+          LLVM_COMMIT_MSG=$(git -C "$LLVM_DIR" log -1 --format="%s" 2>/dev/null || echo "Automated build")
+          CLANG_VERSION=$("$INSTALL_DIR/bin/clang" --version | head -1)
           
-          # Read LLVM commit message from changelog
-          LLVM_COMMIT_MSG_HUMAN=""
-          [[ -f "output/changelog.txt" ]] && LLVM_COMMIT_MSG_HUMAN=$(grep 'LLVM repo commit:' output/changelog.txt 2>/dev/null | head -1 || echo "")
+          RELEASE_BODY="CI: Build $RELEASE_TAG
 
-          RELEASE_BODY="Oronyx Clang $RELEASE_TAG
-
-          LLVM: ${{ env.LLVM_BRANCH }}
-          PGO: ${{ env.ENABLE_PGO }} | LTO: ThinLTO | Target: AArch64/ARM/X86
+          Clang version: $CLANG_VERSION
+          LLVM repo commit: $LLVM_COMMIT_MSG
+          Link: https://github.com/llvm/llvm-project/commit/$LLVM_COMMIT_HASH
 
           ---
 
-          Cara pasang:
+          ## Installation
+
           \`\`\`bash
           bash <(wget -qO- https://raw.githubusercontent.com/naidrahiqa/Oronyx_Clang/main/get_clang.sh)
           \`\`\`
 
-          Atau manual:
+          ## Manual Install
+
           \`\`\`bash
           URL=\$(wget -qO- https://raw.githubusercontent.com/naidrahiqa/Oronyx_Clang/main/latest.txt)
           wget \"\$URL\"
           tar -I zstd -xf oronyx-clang-*.tar.zst -C ~/toolchains/
           export PATH=\"~/toolchains/oronyx/bin:\$PATH\"
-          \`\`\``"
+          \`\`\`
+
+          ## Building Linux
+
+          \`\`\`bash
+          export PATH=\"\$HOME/toolchains/oronyx/bin:\$\PATH\"
+
+          make -j\$(nproc) \\
+            O=out \\
+            ARCH=arm64 \\
+            CC=clang \\
+            CROSS_COMPILE=aarch64-linux-gnu- \\
+            LD=ld.lld \\
+            AR=llvm-ar \\
+            NM=llvm-nm \\
+            STRIP=llvm-strip \\
+            OBJCOPY=llvm-objcopy \\
+            OBJDUMP=llvm-objdump
+          \`\`\`
+
+          ## Features
+
+          - PGO (Profile-Guided Optimization)
+          - ThinLTO / FullLTO
+          - BOLT post-build optimization
+          - Polly loop optimizer
+          - Kernel 4.14+ support
+          - AArch64 / ARM targets
+
+          ---
+
+          Signed-off-by: OronyxCI <OronyxCI@users.noreply.github.com>""
 
           # Delete existing release if it exists (rebuild scenario)
           gh release delete "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true

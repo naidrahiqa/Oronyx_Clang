@@ -71,26 +71,6 @@ fmt: ## Format shell scripts with shfmt
 check: lint ## Run all checks (alias for lint)
 
 # ─── Test ────────────────────────────────────────────────────────────────────
-.PHONY: test
-test: ## Run build tests
-	bash tests/test-build.sh
-
-.PHONY: test-compat
-test-compat: ## Run compatibility check
-	bash scripts/check-compat.sh
-
-# ─── Benchmark ──────────────────────────────────────────────────────────────
-.PHONY: bench
-bench: ## Run benchmark (compile time, binary size, memory)
-	bash scripts/benchmark.sh
-
-.PHONY: bench-quick
-bench-quick: ## Run benchmark with 1 iteration (fast)
-	RUNS=1 bash scripts/benchmark.sh
-
-.PHONY: bench-full
-bench-full: ## Run benchmark with 5 iterations (accurate)
-	RUNS=5 bash scripts/benchmark.sh
 
 # ─── Docker ──────────────────────────────────────────────────────────────────
 .PHONY: docker-build
