@@ -98,7 +98,7 @@ jobs:
             zstd build-essential ca-certificates
 
       - name: Setup ccache
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: ~/.cache/ccache
           key: ${{ runner.os }}-ccache-${{ matrix.llvm_version }}-${{ github.run_id }}
@@ -120,7 +120,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: oronyx-clang-${{ matrix.llvm_version }}
           path: |

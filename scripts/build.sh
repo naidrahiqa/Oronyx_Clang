@@ -13,7 +13,7 @@ ENABLE_PGO="${ENABLE_PGO:-true}"
 ENABLE_BOLT="${ENABLE_BOLT:-true}"
 PGO_WORKLOAD="${PGO_WORKLOAD:-sqlite}"
 LTO_MODE="${LTO_MODE:-Thin}"
-ZSTD_LEVEL="${ZSTD_LEVEL:-19}"}
+ZSTD_LEVEL="${ZSTD_LEVEL:-19}"
 
 # Memory-aware job scaling
 if [[ -z "${JOBS:-}" ]]; then
