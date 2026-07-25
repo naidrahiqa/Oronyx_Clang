@@ -1,63 +1,119 @@
 #!/usr/bin/env bash
-# Cyrene Clang — One-liner Installer
-# Usage: bash <(wget -qO- https://raw.githubusercontent.com/naidrahiqa/cyrene_clang/main/get_clang.sh)
+# Oronyx Clang — One-liner Installer
+# Usage: bash <(wget -qO- https://raw.githubusercontent.com/naidrahiqa/Oronyx_Clang/main/get_clang.sh)
 set -euo pipefail
 
-REPO="naidrahiqa/cyrene_clang"
-INSTALL_DIR="${CYRENE_DIR:-$HOME/toolchains/cyrene}"
+REPO="naidrahiqa/Oronyx_Clang"
+BASE_URL="https://raw.githubusercontent.com/$REPO/main"
+INSTALL_DIR="${ORONYX_DIR:-$HOME/toolchains/oronyx}"
 
-echo "========================================"
-echo " Cyrene Clang Installer"
-echo "========================================"
-echo "Install directory: $INSTALL_DIR"
+# ─── Color helpers ────────────────────────────────────────────────────────────
+if [[ -t 1 ]]; then
+  RED='\033[1;31m'; GREEN='\033[1;32m'; YELLOW='\033[1;33m'
+  CYAN='\033[1;36m'; NC='\033[0m'; BOLD='\033[1m'
+else
+  RED=''; GREEN=''; YELLOW=''; CYAN=''; NC=''; BOLD=''
+fi
+
+info()  { echo -e "${CYAN}[$1/$TOTAL]${NC} $2"; }
+ok()    { echo -e "  ${GREEN}✓${NC} $1"; }
+warn()  { echo -e "  ${YELLOW}⚠${NC} $1"; }
+fail()  { echo -e "  ${RED}✗${NC} $1"; exit 1; }
+header(){ echo -e "${BOLD}$1${NC}"; }
+
+TOTAL=6
+
+header "═══════════════════════════════════════════"
+header "  Oronyx Clang Installer"
+header "═══════════════════════════════════════════"
+echo "  Directory: $INSTALL_DIR"
 echo ""
 
-# Step 1: Fetch latest release
-echo "[1/4] Fetching latest release ..."
-LATEST_URL=$(curl -sL "https://api.github.com/repos/$REPO/releases/latest" | \
-  grep -oP '"browser_download_url":\s*"\K[^"]+\.tar\.zst' | head -1)
+# ─── [1/6] Validate dependencies ─────────────────────────────────────────────
+info 1 "Checking dependencies ..."
+DEPS=(wget tar zstd curl)
+MISSING=()
+for dep in "${DEPS[@]}"; do
+  if ! command -v "$dep" &>/dev/null; then
+    MISSING+=("$dep")
+  fi
+done
+if [[ ${#MISSING[@]} -gt 0 ]]; then
+  fail "Missing: ${MISSING[*]}"
+fi
+ok "All dependencies found"
+
+# ─── [2/6] Fetch latest release URL ──────────────────────────────────────────
+info 2 "Fetching latest release URL ..."
+LATEST_URL=""
+
+# Preferred: source get_latest_url.sh from repo (only var assignments, safe)
+URL_SCRIPT=$(curl -sL "$BASE_URL/get_latest_url.sh" 2>/dev/null || true)
+if [[ -n "$URL_SCRIPT" ]]; then
+  eval "$(echo "$URL_SCRIPT" | grep -E '^LATEST_URL=' || true)"
+fi
+
+# Fallback 1: read latest.txt from repo
+if [[ -z "$LATEST_URL" ]]; then
+  LATEST_URL=$(curl -sL "$BASE_URL/latest.txt" 2>/dev/null || true)
+fi
+
+# Fallback 2: GitHub API
+if [[ -z "$LATEST_URL" ]]; then
+  LATEST_URL=$(curl -sL "https://api.github.com/repos/$REPO/releases/latest" | \
+    grep -oP '"browser_download_url":\s*"\K[^"]+\.tar\.zst' | head -1 || true)
+fi
 
 if [[ -z "$LATEST_URL" ]]; then
-  echo "ERROR: Failed to fetch latest release"
-  exit 1
+  fail "Failed to fetch latest release URL"
 fi
-echo "  Latest: $(basename "$LATEST_URL")"
+ok "$(basename "$LATEST_URL")"
 
-# Step 2: Download & extract
-echo "[2/4] Downloading and extracting ..."
+# ─── [3/6] Clean up old installation ─────────────────────────────────────────
+info 3 "Preparing install directory ..."
+if [[ -d "$INSTALL_DIR/bin" ]]; then
+  warn "Removing old installation at $INSTALL_DIR ..."
+  rm -rf "$INSTALL_DIR"
+  ok "Old installation removed"
+fi
 mkdir -p "$INSTALL_DIR"
+ok "Directory ready"
+
+# ─── [4/6] Download & extract ────────────────────────────────────────────────
+info 4 "Downloading and extracting ..."
 if wget -qO- "$LATEST_URL" | tar -I zstd -xf - -C "$INSTALL_DIR" --strip-components=1; then
-  echo "  Done."
+  ok "Download and extraction complete"
 else
-  echo "ERROR: Download or extraction failed"
-  exit 1
+  fail "Download or extraction failed"
 fi
 
-# Step 3: Fix ld symlink
-echo "[3/4] Fixing ld symlink ..."
+# ─── [5/6] Fix ld symlink ────────────────────────────────────────────────────
+info 5 "Fixing ld symlink ..."
 if [[ -f "$INSTALL_DIR/bin/ld.lld" && ! -e "$INSTALL_DIR/bin/ld" ]]; then
   ln -sf ld.lld "$INSTALL_DIR/bin/ld"
-  echo "  ld -> ld.lld symlink created"
-fi
-
-# Step 4: Verify
-echo "[4/4] Verifying installation ..."
-if [[ -e "$INSTALL_DIR/bin/clang" ]]; then
-  VERSION=$("$INSTALL_DIR/bin/clang" --version | head -1)
-  echo "  OK: $VERSION"
+  ok "ld → ld.lld symlink created"
 else
-  echo "ERROR: clang not found"
-  exit 1
+  ok "ld symlink already in place"
+fi
+
+# ─── [6/6] Verify ────────────────────────────────────────────────────────────
+info 6 "Verifying installation ..."
+if [[ -x "$INSTALL_DIR/bin/clang" ]]; then
+  VERSION=$("$INSTALL_DIR/bin/clang" --version | head -1)
+  ok "$VERSION"
+else
+  fail "clang binary not found"
 fi
 
 echo ""
-echo "========================================"
-echo " Installation complete!"
-echo "========================================"
+header "═══════════════════════════════════════════"
+header "  Installation complete!"
+header "═══════════════════════════════════════════"
 echo ""
-echo "Add to your shell profile:"
-echo "  export PATH=\"$INSTALL_DIR/bin:\$PATH\""
+echo "  ${BOLD}Add to your shell profile:${NC}"
+echo "    export PATH=\"$INSTALL_DIR/bin:\$PATH\""
 echo ""
-echo "Or run directly:"
-echo "  $INSTALL_DIR/bin/clang --version"
-echo "========================================"
+echo "  ${BOLD}Or run directly:${NC}"
+echo "    $INSTALL_DIR/bin/clang --version"
+echo ""
+header "═══════════════════════════════════════════"

@@ -1,7 +1,7 @@
 # Compiler Build Optimizer Skill
 
 ## 📋 Overview
-Optimizes and validates the Cyrene Clang custom LLVM/Clang 18 toolchain build for Android kernel compilation. This skill drives PGO (Profile-Guided Optimization), ThinLTO (Thin Link-Time Optimization), BOLT (Binary Optimization and Layout Tool), and Polly loop optimizations. It verifies the correctness of build artifacts, benchmarks compiler performance against baseline, and ensures Docker-based reproducible builds succeed.
+Optimizes and validates the Oronyx Clang custom LLVM/Clang 18 toolchain build for Android kernel compilation. This skill drives PGO (Profile-Guided Optimization), ThinLTO (Thin Link-Time Optimization), BOLT (Binary Optimization and Layout Tool), and Polly loop optimizations. It verifies the correctness of build artifacts, benchmarks compiler performance against baseline, and ensures Docker-based reproducible builds succeed.
 
 ## 🎯 Core Responsibilities
 - Run `make build` or `bash scripts/build.sh` and verify artifact generation
@@ -9,7 +9,7 @@ Optimizes and validates the Cyrene Clang custom LLVM/Clang 18 toolchain build fo
 - Confirm PGO profile data is available and non-corrupt before an optimized build
 - Check ThinLTO cache directory exists and contains expected module files
 - Execute `bash scripts/benchmark.sh` and compare results against stored baselines
-- Run Docker build with `docker build -t cyrene-clang .`
+- Run Docker build with `docker build -t oronyx-clang .`
 - Inspect generated bitcode with `llvm-dis`, `opt`, and `llc` for correctness
 - Verify BOLT instrumentation and optimization stages produce valid binaries
 
@@ -62,8 +62,8 @@ optimization_passes:
 - Run `llvm-dis < builtins.bc` to disassemble generated bitcode and verify structure
 - Run `opt -passes='verify' < builtins.bc > /dev/null` to confirm IR validity
 - Run `llc -O2 -filetype=obj builtins.bc -o builtins.o` to confirm object emission
-- Check `build/stage1/bin/clang --version` reports `Cyrene-Clang 18.x`
-- Verify Docker image builds and `docker run --rm cyrene-clang clang --version` succeeds
+- Check `build/stage1/bin/clang --version` reports `Oronyx-Clang 18.x`
+- Verify Docker image builds and `docker run --rm oronyx-clang clang --version` succeeds
 
 ### Phase 4: REPORT GENERATION
 - Generate `build/optimizer-report.json` with: build status, LLVM version, PGO/ThinLTO/BOLT/Polly flags, benchmark delta, artifact sizes
@@ -76,8 +76,8 @@ quality_checks:
   - check_id: "CHK-001"
     name: "LLVM Version Validation"
     command: |
-      "$PROJECT_DIR/build/stage1/bin/clang" --version 2>&1 | Select-String -Pattern "Cyrene-Clang 18\."
-    expected_output: "Cyrene-Clang 18."
+      "$PROJECT_DIR/build/stage1/bin/clang" --version 2>&1 | Select-String -Pattern "Oronyx-Clang 18\."
+    expected_output: "Oronyx-Clang 18."
     failure_indicator: "not found"
     severity: "critical"
 
@@ -142,12 +142,12 @@ quality_checks:
     name: "Docker Build & Version Check"
     command: |
       cd "$PROJECT_DIR"
-      docker build -t cyrene-clang:latest . 2>&1 | Select-Object -Last 3
+      docker build -t oronyx-clang:latest . 2>&1 | Select-Object -Last 3
       if ($LASTEXITCODE -ne 0) { Write-Error "Docker build failed"; exit 1 }
-      $version = docker run --rm cyrene-clang:latest clang --version 2>&1 | Select-String "Cyrene-Clang 18\."
+      $version = docker run --rm oronyx-clang:latest clang --version 2>&1 | Select-String "Oronyx-Clang 18\."
       if (-not $version) { Write-Error "Docker image has wrong clang version"; exit 1 }
       Write-Output "Docker build OK — $($version.ToString().Trim())"
-    expected_output: "Docker build OK — Cyrene-Clang 18."
+    expected_output: "Docker build OK — Oronyx-Clang 18."
     failure_indicator: "Docker build failed|wrong clang version"
     severity: "critical"
 
@@ -216,7 +216,7 @@ quality_checks:
   "properties": {
     "project_dir": {
       "type": "string",
-      "description": "Absolute path to Cyrene-clang project root"
+      "description": "Absolute path to Oronyx-clang project root"
     },
     "actions": {
       "type": "array",
@@ -327,7 +327,7 @@ jobs:
       - name: Validate LLVM Version
         if: always()
         run: |
-          build/stage1/bin/clang --version | grep "Cyrene-Clang 18\."
+          build/stage1/bin/clang --version | grep "Oronyx-Clang 18\."
       - name: Validate PGO Profiles
         if: always()
         run: |
@@ -378,11 +378,11 @@ jobs:
 ### CLI Interface
 ```bash
 # Full optimization pipeline
-export PROJECT_DIR=/path/to/Cyrene-clang
+export PROJECT_DIR=/path/to/Oronyx-clang
 cd $PROJECT_DIR && bash scripts/build.sh && bash scripts/benchmark.sh
 
 # Validate LLVM version
-build/stage1/bin/clang --version | grep "Cyrene-Clang 18"
+build/stage1/bin/clang --version | grep "Oronyx-Clang 18"
 
 # Validate PGO profiles
 llvm-profdata show profiles/*.profdata
@@ -394,7 +394,7 @@ ls -la build/thinlto-cache/
 opt -passes='verify' build/lib/clang/18.0.0/lib/windows/libclang_rt.builtins-x86_64.bc -o /dev/null
 
 # Docker build + smoke test
-docker build -t cyrene-clang:latest . && docker run --rm cyrene-clang:latest clang --version
+docker build -t oronyx-clang:latest . && docker run --rm oronyx-clang:latest clang --version
 
 # Benchmark comparison
 powershell -Command "
@@ -454,14 +454,14 @@ errors:
     recovery: |
       run: |
         docker system prune -a --volumes -f
-        docker build --memory=8g --memory-swap=16g -t cyrene-clang:latest .
+        docker build --memory=8g --memory-swap=16g -t oronyx-clang:latest .
     escalation: "Increase Docker memory limit in settings to 16 GB minimum"
 ```
 
 ## 🎓 CLI USAGE EXAMPLES
 ```bash
 # Full build and benchmark
-cd D:\Dev\Project-Coding\2026\skills\Cyrene-clang
+cd D:\Dev\Project-Coding\2026\skills\Oronyx-clang
 $env:PROJECT_DIR = (Get-Location).Path
 bash scripts/build.sh
 bash scripts/benchmark.sh
@@ -480,9 +480,9 @@ llvm-dis build/lib/clang/18.0.0/lib/windows/libclang_rt.builtins-x86_64.bc -o ou
 Get-Content output.ll -Head 50
 
 # Docker smoke test
-docker build -t cyrene-clang . --no-cache
-docker run --rm cyrene-clang clang --version
-docker run --rm cyrene-clang llvm-dis --version
+docker build -t oronyx-clang . --no-cache
+docker run --rm oronyx-clang clang --version
+docker run --rm oronyx-clang llvm-dis --version
 
 # BOLT optimization check
 Get-ChildItem -Path build/ -Recurse -Filter "*.bolt" | ForEach-Object { Write-Output "$($_.Name) — $($_.Length) bytes" }
@@ -521,7 +521,7 @@ environment:
   CC: "clang"
   CXX: "clang++"
   CMAKE_GENERATOR: "Ninja"
-  PROJECT_DIR: "D:\\Dev\\Project-Coding\\2026\\skills\\Cyrene-clang"
+  PROJECT_DIR: "D:\\Dev\\Project-Coding\\2026\\skills\\Oronyx-clang"
 
 config_files:
   - path: "config/build.conf"

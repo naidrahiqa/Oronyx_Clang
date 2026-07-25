@@ -1,14 +1,14 @@
 # =============================================================================
-# Cyrene Clang — Workflow Configuration
+# Oronyx Clang — Workflow Configuration
 # =============================================================================
 # This file is companion to .opencode/AGENTS.md.
 # Controls skill behavior, workflow routing, notifications, and CI integration.
 # =============================================================================
 
 team:
-  name: "Cyrene Clang Development Team"
+  name: "Oronyx Clang Development Team"
   size: 3
-  project: "Cyrene Clang v22.1.0"
+  project: "Oronyx Clang v22.1.0"
   project_type: compiler
   primary_languages: ["C", "Assembly", "Bash", "Python", "Makefile"]
   ci_cd_platform: github-actions
@@ -298,10 +298,10 @@ notifications:
     channels: [telegram, github-issue, email]
     recipients:
       telegram: "@technical_lead"
-      email: ["lead@cyrene-clang.dev"]
+      email: ["lead@oronyx-clang.dev"]
     message_template: |
       🚨 CRITICAL: {issue_count} issue(s) found in {workflow}
-      Project: Cyrene Clang v22.1.0
+      Project: Oronyx Clang v22.1.0
       Findings: {findings_summary}
       Action required immediately.
 

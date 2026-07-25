@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cyrene Clang — Enhanced Telegram Notification Script
+# Oronyx Clang — Enhanced Telegram Notification Script
 # Sends build status notifications via Telegram Bot API with rich HTML formatting,
 # build metadata, and changelog support.
 # Usage: ./notify.sh <started|success|failure|error_dump|changelog|release>
@@ -48,9 +48,9 @@ send_msg_to() {
 # ─── Build metadata ───────────────────────────────────────────────────────────
 RUN_NUMBER="${GITHUB_RUN_NUMBER:-local}"
 RUN_ID="${GITHUB_RUN_ID:-0}"
-REPO="${GITHUB_REPOSITORY:-naidrahiqa/cyrene_clang}"
+REPO="${GITHUB_REPOSITORY:-naidrahiqa/Oronyx_Clang}"
 RUN_URL="https://github.com/$REPO/actions/runs/$RUN_ID"
-CYRENE_COMMIT="${GITHUB_SHA:-unknown}"
+ORONYX_COMMIT="${GITHUB_SHA:-unknown}"
 
 CLANG_VERSION="${CLANG_VERSION:-unknown}"
 LLVM_BRANCH="${LLVM_BRANCH:-main}"
@@ -97,23 +97,23 @@ fmt_llvm_link() {
   fi
 }
 
-fmt_cyrene_link() {
+fmt_oronyx_link() {
   local commit="$1"
   if [[ -n "$commit" && "$commit" != "unknown" ]]; then
-    echo "🔧 Cyrene Clang: <a href=\"https://github.com/$REPO/commit/$commit\"><code>${commit:0:7}</code></a>"
+    echo "🔧 Oronyx Clang: <a href=\"https://github.com/$REPO/commit/$commit\"><code>${commit:0:7}</code></a>"
   else
-    echo "🔧 Cyrene Clang: <code>unknown</code>"
+    echo "🔧 Oronyx Clang: <code>unknown</code>"
   fi
 }
 
 # ─── Message handlers ─────────────────────────────────────────────────────────
 case "$MESSAGE_TYPE" in
   started)
-    MSG="$(fmt_header "Cyrene Clang Build #$RUN_NUMBER Started")"
+    MSG="$(fmt_header "Oronyx Clang Build #$RUN_NUMBER Started")"
     MSG="$MSG
 🛠 <b>Build #$RUN_NUMBER triggered</b>"
     MSG="$MSG
-$(fmt_cyrene_link "$CYRENE_COMMIT")"
+$(fmt_oronyx_link "$ORONYX_COMMIT")"
     MSG="$MSG
 📌 Branch: <code>$LLVM_BRANCH</code>"
     MSG="$MSG
@@ -146,11 +146,11 @@ $(fmt_section)
     PGO_STR="✅ Enabled"
     [[ "$ENABLE_PGO" == "false" ]] && PGO_STR="❌ Disabled"
 
-    CYRENE_VER="${RELEASE_TAG#cyrene-}"
-    [[ -z "$CYRENE_VER" ]] && CYRENE_VER="$CLANG_VERSION"
+    ORONYX_VER="${RELEASE_TAG#oronyx-}"
+    [[ -z "$ORONYX_VER" ]] && ORONYX_VER="$CLANG_VERSION"
     RELEASE_URL="https://github.com/$REPO/releases/tag/$RELEASE_TAG"
 
-    MSG="$(fmt_header "Cyrene Clang Build #$RUN_NUMBER SUCCEEDED")"
+    MSG="$(fmt_header "Oronyx Clang Build #$RUN_NUMBER SUCCEEDED")"
     MSG="$MSG
 📅 $(date -u +%d/%m/%y) | ⏱ <code>$BUILD_DURATION</code>"
     MSG="$MSG
@@ -216,9 +216,9 @@ $(fmt_section)
     ERROR_SNIPPET=$(escape_html "$ERROR_SNIPPET")
     ERROR_FIRST_LINE=$(escape_html "$ERROR_FIRST_LINE")
 
-    MSG="$(fmt_header "Cyrene Clang Build #$RUN_NUMBER FAILED")"
+    MSG="$(fmt_header "Oronyx Clang Build #$RUN_NUMBER FAILED")"
     MSG="$MSG
-$(fmt_cyrene_link "$CYRENE_COMMIT")"
+$(fmt_oronyx_link "$ORONYX_COMMIT")"
     MSG="$MSG
 📌 Branch: <code>$LLVM_BRANCH</code>"
     MSG="$MSG
@@ -284,12 +284,12 @@ $(fmt_section)
     FULL_LOG=$(escape_html "$FULL_LOG")
     ERROR_FIRST_LINE=$(escape_html "$ERROR_FIRST_LINE")
 
-    MSG="$(fmt_header "Cyrene Clang Build #$RUN_NUMBER — Error Dump")"
+    MSG="$(fmt_header "Oronyx Clang Build #$RUN_NUMBER — Error Dump")"
     MSG="$MSG
 🐛 <b>Full error log from failed build</b>"
     MSG="$MSG
 $(fmt_section)
-$(fmt_cyrene_link "$CYRENE_COMMIT")"
+$(fmt_oronyx_link "$ORONYX_COMMIT")"
     MSG="$MSG
 📌 Branch: <code>$LLVM_BRANCH</code>"
     MSG="$MSG
@@ -343,17 +343,17 @@ $(fmt_section)
 
   release)
     RELEASE_URL="https://github.com/$REPO/releases/tag/$RELEASE_TAG"
-    CYRENE_VER="${RELEASE_TAG#cyrene-}"
+    ORONYX_VER="${RELEASE_TAG#oronyx-}"
     PGO_STR="✅ Enabled"
     [[ "$ENABLE_PGO" == "false" ]] && PGO_STR="❌ Disabled"
     BOLT_STR="✅"
     [[ "$ENABLE_BOLT" != "true" ]] && BOLT_STR="❌"
 
-    MSG="$(fmt_header "Cyrene Clang $CYRENE_VER Released")"
+    MSG="$(fmt_header "Oronyx Clang $ORONYX_VER Released")"
     MSG="$MSG
 📅 Update:$(date -u +%d/%m/%y)"
     MSG="$MSG
-🔧 Version: <code>$CYRENE_VER</code>"
+🔧 Version: <code>$ORONYX_VER</code>"
     MSG="$MSG
 🎯 Target: <code>$TARGETS</code>"
     MSG="$MSG
@@ -400,13 +400,13 @@ $(fmt_section)
 💬 <b>Join support group</b> (<a href=\"https://t.me/bwabwabwa_discus\">@bwabwabwa_discus</a>)"
     MSG="$MSG
 $(fmt_section)
-#CyreneClang #LLVM #Clang #Toolchain #AndroidKernel #AArch64 #ARM #ThinLTO #PGO #BOLT"
+#OronyxClang #LLVM #Clang #Toolchain #AndroidKernel #AArch64 #ARM #ThinLTO #PGO #BOLT"
     send_msg "$MSG"
     ;;
 
   release_old)
     RELEASE_URL="https://github.com/$REPO/releases/tag/$RELEASE_TAG"
-    MSG="$(fmt_header "Cyrene Clang $RELEASE_TAG Released")"
+    MSG="$(fmt_header "Oronyx Clang $RELEASE_TAG Released")"
     MSG="$MSG
 ✅ <b>Release published successfully!</b>"
     MSG="$MSG
@@ -421,7 +421,7 @@ $(fmt_section)
     MSG="$MSG
 $(fmt_section)
 🚀 <b>Quick Download:</b>
-<pre><code>wget $RELEASE_URL/download/$RELEASE_TAG/${TARBALL_NAME:-cyrene-clang.tar.zst}</code></pre>"
+<pre><code>wget $RELEASE_URL/download/$RELEASE_TAG/${TARBALL_NAME:-oronyx-clang.tar.zst}</code></pre>"
     MSG="$MSG
 🔗 <a href=\"$RELEASE_URL\">View Release</a>"
     send_msg "$MSG"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CyreneClang — Build Test Script
+# OronyxClang — Build Test Script
 # Validates that build scripts are syntactically correct and tools are available.
 set -euo pipefail
 
@@ -16,7 +16,7 @@ ok()   { echo -e " ${GRN}PASS${RST} $1"; ((PASS++)); }
 fail() { echo -e " ${RED}FAIL${RST} $1"; ((FAIL++)); }
 warn() { echo -e " ${YLW}WARN${RST} $1"; }
 
-echo "CyreneClang Build Tests"
+echo "OronyxClang Build Tests"
 echo "======================="
 echo ""
 

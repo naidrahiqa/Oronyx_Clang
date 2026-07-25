@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Common issues and solutions when using CyreneClang.
+Common issues and solutions when using OronyxClang.
 
 ## Build Issues
 
@@ -48,7 +48,7 @@ Common issues and solutions when using CyreneClang.
 
 **Solution:**
 ```bash
-export PATH="$HOME/toolchains/cyrene/bin:$PATH"
+export PATH="$HOME/toolchains/oronyx/bin:$PATH"
 # Add to ~/.bashrc for persistence
 ```
 
@@ -58,7 +58,7 @@ export PATH="$HOME/toolchains/cyrene/bin:$PATH"
 
 **Solution:**
 ```bash
-cd $HOME/toolchains/cyrene/bin
+cd $HOME/toolchains/oronyx/bin
 ln -sf $(which ld.lld) ld
 ```
 
@@ -67,7 +67,7 @@ ln -sf $(which ld.lld) ld
 **Cause:** System libc++ conflicts with toolchain.
 
 **Solution:**
-- CyreneClang bundles its own libc++
+- OronyxClang bundles its own libc++
 - Set `LD_LIBRARY_PATH` to toolchain lib dir
 - Or use `LD_PRELOAD` with toolchain's libc++.so
 

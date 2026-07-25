@@ -1,12 +1,12 @@
-# Contributing to CyreneClang
+# Contributing to OronyxClang
 
 Thank you for your interest in contributing! This guide will help you get started.
 
 ## Development Setup
 
 ```bash
-git clone https://github.com/naidrahiqa/cyrene_clang
-cd cyrene_clang
+git clone https://github.com/naidrahiqa/Oronyx_Clang
+cd Oronyx_Clang
 chmod +x scripts/*.sh
 ```
 

@@ -122,9 +122,9 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v5
         with:
-          name: cyrene-clang-${{ matrix.llvm_version }}
+          name: oronyx-clang-${{ matrix.llvm_version }}
           path: |
-            ${{ env.OUTPUT_DIR }}/cyrene-clang-*.tar.zst
+            ${{ env.OUTPUT_DIR }}/oronyx-clang-*.tar.zst
             ${{ env.OUTPUT_DIR }}/clang-version.txt
           retention-days: 30
 
@@ -142,7 +142,7 @@ jobs:
 
           gh release create "$VERSION" \
             --repo "$GITHUB_REPOSITORY" \
-            --title "Cyrene Clang $VERSION" \
+            --title "Oronyx Clang $VERSION" \
             --notes "Automated build for LLVM $VERSION" \
             --latest \
             "$TARBALL" \

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Cyrene Clang — Auto-generate CHANGELOG from commits
+# Oronyx Clang — Auto-generate CHANGELOG from commits
 # Usage: bash scripts/generate-changelog.sh [from_tag] [to_tag]
 set -euo pipefail
 
-REPO="naidrahiqa/cyrene_clang"
+REPO="naidrahiqa/Oronyx_Clang"
 FROM_TAG="${1:-}"
 TO_TAG="${2:-HEAD}"
 

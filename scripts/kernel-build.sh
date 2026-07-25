@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# CyreneClang — Unified Kernel Build Script
+# OronyxClang — Unified Kernel Build Script
 # Auto-detects kernel version and applies correct flags for 4.19+ kernels.
 # Replaces kernel-4x-build.sh and kernel-lto.sh with a single entry point.
 # Usage: bash scripts/kernel-build.sh <kernel-dir> [options]
 set -euo pipefail
 
 # ─── Configuration ────────────────────────────────────────────────────────────
-CYRENE_ROOT="${CYRENE_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+ORONYX_ROOT="${ORONYX_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 # Defaults
 KERNEL_DIR=""
 ARCH="${ARCH:-arm64}"
@@ -67,7 +67,7 @@ START_TIME=$(date +%s)
 
 usage() {
   cat << 'EOF'
-CyreneClang — Unified Kernel Build Script
+OronyxClang — Unified Kernel Build Script
 
 Usage: kernel-build.sh <kernel-dir> [options]
 
@@ -154,14 +154,14 @@ detect_kernel() {
   log "Detected kernel: $KERNEL_FULL"
 
   if [[ "$KERNEL_V" -lt 4 || ("$KERNEL_V" -eq 4 && "$KERNEL_P" -lt 14) ]]; then
-    warn "Kernel < 4.14 is NOT supported by CyreneClang. Proceed at your own risk."
+    warn "Kernel < 4.14 is NOT supported by OronyxClang. Proceed at your own risk."
   fi
 }
 
 # ─── Detect Clang version ──────────────────────────────────────────────────
 detect_clang() {
   if ! command -v clang &>/dev/null; then
-    die "clang not found in PATH. Add CyreneClang bin to PATH first."
+    die "clang not found in PATH. Add OronyxClang bin to PATH first."
   fi
 
   CLANG_VER=$(clang --version | head -1 | grep -oP '\d+\.\d+\.\d+' | head -1 || echo "unknown")
@@ -481,7 +481,7 @@ print_summary() {
 
 # ─── Main ────────────────────────────────────────────────────────────────────
 main() {
-  log "CyreneClang — Unified Kernel Build Script"
+  log "OronyxClang — Unified Kernel Build Script"
   echo ""
 
   parse_args "$@"

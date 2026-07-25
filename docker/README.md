@@ -1,6 +1,6 @@
 # Docker Build Environment
 
-Reproducible build environment for CyreneClang.
+Reproducible build environment for OronyxClang.
 
 ## Quick Start
 
@@ -12,8 +12,8 @@ make docker-build
 make docker-run
 
 # Or manually
-docker build -t cyrene-clang .
-docker run --rm -v $(pwd):/workspace -w /workspace cyrene-clang make build
+docker build -t oronyx-clang .
+docker run --rm -v $(pwd):/workspace -w /workspace oronyx-clang make build
 ```
 
 ## Custom Build Options
@@ -22,12 +22,12 @@ docker run --rm -v $(pwd):/workspace -w /workspace cyrene-clang make build
 # Build with PGO enabled
 docker run --rm -v $(pwd):/workspace -w /workspace \
   -e ENABLE_PGO=true \
-  cyrene-clang make build
+  oronyx-clang make build
 
 # Build specific LLVM branch
 docker run --rm -v $(pwd):/workspace -w /workspace \
   -e LLVM_BRANCH=llvmorg-22.1.0 \
-  cyrene-clang make build
+  oronyx-clang make build
 ```
 
 ## Notes

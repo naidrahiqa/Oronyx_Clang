@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# CyreneClang — Compatibility Validator
-# Checks that CyreneClang is correctly installed and compatible with a kernel tree.
+# OronyxClang — Compatibility Validator
+# Checks that OronyxClang is correctly installed and compatible with a kernel tree.
 # Usage: scripts/check-compat.sh [kernel-source-dir]
 set -euo pipefail
 
-CYRENE_ROOT="${CYRENE_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
-MANIFEST="$CYRENE_ROOT/clang-version.txt"
+ORONYX_ROOT="${ORONYX_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+MANIFEST="$ORONYX_ROOT/clang-version.txt"
 KERNEL_DIR="${1:-}"
 
 PASS=0
@@ -19,7 +19,7 @@ warn() { echo -e " ${YLW}⚠${RST} $1"; ((WARN++)) || true; }
 err()  { echo -e " ${RED}✗${RST} $1"; ((FAIL++)) || true; }
 info() { echo -e "   $1"; }
 
-echo -e "${BLD}CyreneClang Compatibility Check${RST}"
+echo -e "${BLD}OronyxClang Compatibility Check${RST}"
 echo ""
 
 # ─── 1. Toolchain binaries ──────────────────────────────────────────────
@@ -63,7 +63,7 @@ if [[ -f "$MANIFEST" ]]; then
   done < "$MANIFEST"
   echo ""
 else
-  warn "clang-version.txt not found (set CYRENE_ROOT or run from repo root)"
+  warn "clang-version.txt not found (set ORONYX_ROOT or run from repo root)"
 fi
 
 # ─── 3. Clang version ───────────────────────────────────────────────────

@@ -1,7 +1,7 @@
-# Compiler Optimizer (PGO/LTO/BOLT/Polly) - Cyrene Clang
+# Compiler Optimizer (PGO/LTO/BOLT/Polly) - Oronyx Clang
 
 ## Overview
-Optimizes the Cyrene Clang toolchain using PGO (Profile-Guided Optimization), ThinLTO (Thin Link-Time Optimization), BOLT (Binary Optimization & Layout Tool), and Polly polyhedral loop optimizations. Configures via `config/build.conf`, validates profile data integrity, and generates optimized stage2 binaries.
+Optimizes the Oronyx Clang toolchain using PGO (Profile-Guided Optimization), ThinLTO (Thin Link-Time Optimization), BOLT (Binary Optimization & Layout Tool), and Polly polyhedral loop optimizations. Configures via `config/build.conf`, validates profile data integrity, and generates optimized stage2 binaries.
 
 ## Core Responsibilities
 - Enable and configure PGO: verify `profiles/*.profdata` exist and non-corrupt via `llvm-profdata show`

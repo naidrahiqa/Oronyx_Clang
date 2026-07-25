@@ -1,4 +1,4 @@
-# CyreneClang Makefile
+# OronyxClang Makefile
 # Common tasks for development and CI
 
 SHELL := /bin/bash
@@ -8,19 +8,19 @@ SHELL := /bin/bash
 VERSION    := $(shell cat VERSION 2>/dev/null || echo "unknown")
 LLVM_BRANCH := $(shell cat .llvm-version 2>/dev/null || echo "llvmorg-22.1.8")
 BUILD_DIR  := build
-INSTALL_DIR := $(HOME)/toolchains/cyrene
+INSTALL_DIR := $(HOME)/toolchains/oronyx
 
 # ─── Help ────────────────────────────────────────────────────────────────────
 .PHONY: help
 help: ## Show this help
-	@echo "CyreneClang $(VERSION) (LLVM $(LLVM_BRANCH))"
+	@echo "OronyxClang $(VERSION) (LLVM $(LLVM_BRANCH))"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
 # ─── Build ───────────────────────────────────────────────────────────────────
 .PHONY: build
-build: ## Build CyreneClang (PGO=true, BOLT=true)
+build: ## Build OronyxClang (PGO=true, BOLT=true)
 	bash scripts/build.sh
 
 .PHONY: build-simple
@@ -39,9 +39,18 @@ build-version: ## Build specific LLVM version (LLVM_VERSION=17.0.6)
 		echo "  make build-version LLVM_VERSION=17.0.6"; \
 		echo "  make build-version LLVM_VERSION=18.1.8"; \
 		echo "  make build-version LLVM_VERSION=19.1.0"; \
+		echo "  make build-version LLVM_VERSION=main LLVM_SOURCE=android"; \
 		exit 1; \
 	fi
 	LLVM_BRANCH=llvmorg-$(LLVM_VERSION) bash scripts/build.sh
+
+.PHONY: build-main
+build-main: ## Build from LLVM main branch (rolling release)
+	LLVM_BRANCH=main bash scripts/build.sh
+
+.PHONY: build-android
+build-android: ## Build from Android's LLVM fork
+	LLVM_SOURCE=android bash scripts/build.sh
 
 # ─── Quality ─────────────────────────────────────────────────────────────────
 .PHONY: lint
@@ -86,11 +95,11 @@ bench-full: ## Run benchmark with 5 iterations (accurate)
 # ─── Docker ──────────────────────────────────────────────────────────────────
 .PHONY: docker-build
 docker-build: ## Build in Docker container
-	docker build -t cyrene-clang .
+	docker build -t oronyx-clang .
 
 .PHONY: docker-run
 docker-run: ## Run build inside Docker
-	docker run --rm -v $$(pwd):/workspace -w /workspace cyrene-clang make build
+	docker run --rm -v $$(pwd):/workspace -w /workspace oronyx-clang make build
 
 # ─── Patches ─────────────────────────────────────────────────────────────────
 .PHONY: sync-patches
@@ -120,4 +129,4 @@ package: ## Package toolchain for release
 
 .PHONY: version
 version: ## Show current version
-	@echo "CyreneClang $(VERSION) (LLVM $(LLVM_BRANCH))"
+	@echo "OronyxClang $(VERSION) (LLVM $(LLVM_BRANCH))"

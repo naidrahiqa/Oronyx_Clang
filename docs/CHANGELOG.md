@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Cyrene Clang will be documented in this file.
+All notable changes to Oronyx Clang will be documented in this file.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
@@ -8,7 +8,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
-- **Vendor string** — Renamed from "CyreneClang" to "Cyrene Clang" for better readability
+- **Vendor string** — Renamed from "CyreneClang" to "Oronyx Clang" for better readability
 - **CI/CD schedule** — Removed fixed weekly cron schedule; build now only triggers on:
   - Manual dispatch (`workflow_dispatch`)
   - Push to `patches/`, `scripts/`, or `.github/workflows/`
@@ -105,7 +105,7 @@ Build now generates `build/build_metadata.json` with:
 
 ### Added
 
-- Initial CyreneClang release
+- Initial OronyxClang release
 - 2-stage PGO build with SQLite/kernel workload
 - ThinLTO for toolchain optimization
 - BOLT post-build optimization

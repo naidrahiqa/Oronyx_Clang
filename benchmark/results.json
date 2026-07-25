@@ -2,7 +2,7 @@
   {
     "name": "no-lto",
     "version": "22.1.0",
-    "vendor": "Cyrene",
+    "vendor": "Oronyx",
     "lto": "off",
     "avg_time_ms": 1834,
     "avg_size_bytes": 0,
@@ -12,7 +12,7 @@
   {
     "name": "thin-lto",
     "version": "22.1.0",
-    "vendor": "Cyrene",
+    "vendor": "Oronyx",
     "lto": "thin",
     "avg_time_ms": 1308,
     "avg_size_bytes": 0,

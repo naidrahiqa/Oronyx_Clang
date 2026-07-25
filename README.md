@@ -1,16 +1,16 @@
-# Cyrene Clang
+# Oronyx Clang
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![GitHub Release](https://img.shields.io/github/v/release/naidrahiqa/cyrene_clang)](https://github.com/naidrahiqa/cyrene_clang/releases)
-[![Build Status](https://github.com/naidrahiqa/cyrene_clang/actions/workflows/build.yml/badge.svg)](https://github.com/naidrahiqa/cyrene_clang/actions/workflows/build.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/naidrahiqa/Oronyx_Clang)](https://github.com/naidrahiqa/Oronyx_Clang/releases)
+[![Build Status](https://github.com/naidrahiqa/Oronyx_Clang/actions/workflows/build.yml/badge.svg)](https://github.com/naidrahiqa/Oronyx_Clang/actions/workflows/build.yml)
 [![LLVM Version](https://img.shields.io/badge/LLVM-22.1.8-orange.svg)](https://github.com/llvm/llvm-project)
-[![Build Time](https://img.shields.io/badge/Build%20Time-%3E4h%2030m-blue.svg)](https://github.com/naidrahiqa/cyrene_clang/actions/workflows/build.yml)
+[![Build Time](https://img.shields.io/badge/Build%20Time-%3E4h%2030m-blue.svg)](https://github.com/naidrahiqa/Oronyx_Clang/actions/workflows/build.yml)
 
 A prebuilt LLVM/Clang toolchain optimized for Android kernel compilation. Supports LLVM 14 through 22+.
 
 ## What is This?
 
-Cyrene Clang is a **ready-to-use** Clang toolchain for building Android kernels. Download, extract, and compile — no need to build LLVM yourself.
+Oronyx Clang is a **ready-to-use** Clang toolchain for building Android kernels. Download, extract, and compile — no need to build LLVM yourself.
 
 **Key optimizations:**
 - PGO (Profile-Guided Optimization) for faster compilation
@@ -26,13 +26,13 @@ Cyrene Clang is a **ready-to-use** Clang toolchain for building Android kernels.
 
 ## Need Help?
 
-- **Found a bug?** — [Open an issue](https://github.com/naidrahiqa/cyrene_clang/issues)
-- **Want to fix something?** — [Open a PR](https://github.com/naidrahiqa/cyrene_clang/pulls)
-- **Want to build your own?** — [Fork the repo](https://github.com/naidrahiqa/cyrene_clang/fork)
+- **Found a bug?** — [Open an issue](https://github.com/naidrahiqa/Oronyx_Clang/issues)
+- **Want to fix something?** — [Open a PR](https://github.com/naidrahiqa/Oronyx_Clang/pulls)
+- **Want to build your own?** — [Fork the repo](https://github.com/naidrahiqa/Oronyx_Clang/fork)
 
-## Why Cyrene Clang?
+## Why Oronyx Clang?
 
-| Feature | Stock Clang | Cyrene Clang |
+| Feature | Stock Clang | Oronyx Clang |
 |---------|:-----------:|:------------:|
 | PGO | - | 2-stage IR-based |
 | ThinLTO | - | Applied to toolchain |
@@ -63,7 +63,7 @@ Cyrene Clang is a **ready-to-use** Clang toolchain for building Android kernels.
 
 ## Benchmark
 
-Performance comparison of Cyrene Clang against stock Clang, measuring real-world kernel compilation workloads.
+Performance comparison of Oronyx Clang against stock Clang, measuring real-world kernel compilation workloads.
 
 ### What's Measured
 
@@ -73,16 +73,16 @@ Performance comparison of Cyrene Clang against stock Clang, measuring real-world
 | **Binary Size** | Size of the compiled kernel image | Smaller = faster boot, less storage |
 | **Peak Memory** | Maximum RAM usage during compilation | Determines if you can build on your machine |
 
-### Cyrene Clang vs Stock Clang
+### Oronyx Clang vs Stock Clang
 
 Benchmark runs automatically on every release using `scripts/benchmark.sh`:
 
-![Cyrene Clang Benchmark](benchmark/chart.svg)
+![Oronyx Clang Benchmark](benchmark/chart.svg)
 
 <details>
 <summary>Understanding the Charts</summary>
 
-- **Compile Time (ms)** — Lower is better. Cyrene Clang with PGO+BOLT typically shows 10-20% faster compilation.
+- **Compile Time (ms)** — Lower is better. Oronyx Clang with PGO+BOLT typically shows 10-20% faster compilation.
 - **Binary Size** — Lower is better. LTO optimizes dead code elimination.
 - **Peak Memory (GB)** — Lower is better. Memory-aware job scaling helps here.
 
@@ -119,14 +119,14 @@ RUNS=5 bash scripts/benchmark.sh
 ### One-liner install (recommended)
 
 ```bash
-bash <(wget -qO- https://raw.githubusercontent.com/naidrahiqa/cyrene_clang/main/get_clang.sh)
+bash <(wget -qO- https://raw.githubusercontent.com/naidrahiqa/Oronyx_Clang/main/get_clang.sh)
 ```
 
 ### Manual install
 
 ```bash
 # Get the latest manifest
-wget https://raw.githubusercontent.com/naidrahiqa/cyrene_clang/main/clang-version.txt
+wget https://raw.githubusercontent.com/naidrahiqa/Oronyx_Clang/main/clang-version.txt
 
 # Download the toolchain
 DOWNLOAD_URL=$(grep DOWNLOAD_URL clang-version.txt | cut -d= -f2)
@@ -134,17 +134,17 @@ wget "$DOWNLOAD_URL"
 
 # Extract
 mkdir -p $HOME/toolchains
-tar -I zstd -xf cyrene-clang-*.tar.zst -C $HOME/toolchains/
+tar -I zstd -xf oronyx-clang-*.tar.zst -C $HOME/toolchains/
 
 # Fix ld symlink (if needed)
-cd $HOME/toolchains/cyrene/bin
+cd $HOME/toolchains/oronyx/bin
 ln -sf $(which ld.lld) ld
 ```
 
 ## Kernel Integration
 
 ```bash
-export PATH="$HOME/toolchains/cyrene/bin:$PATH"
+export PATH="$HOME/toolchains/oronyx/bin:$PATH"
 
 make -j$(nproc) \
   O=out \
@@ -182,7 +182,7 @@ make -j$(nproc) O=out ARCH=arm64 ...
 ## Repository Structure
 
 ```
-cyrene-clang/
+Oronyx_Clang/
 ├── .github/
 │   ├── workflows/
 │   │   ├── build.yml           # CI/CD pipeline
@@ -234,8 +234,8 @@ cyrene-clang/
 ## Building from Source
 
 ```bash
-git clone https://github.com/naidrahiqa/cyrene_clang
-cd cyrene_clang
+git clone https://github.com/naidrahiqa/Oronyx_Clang
+cd oronyx_clang
 make build  # or: bash scripts/build.sh
 ```
 
@@ -264,21 +264,22 @@ make build  # or: bash scripts/build.sh
 | `LTO_MODE` | `Thin` | LTO mode: `Thin`, `Full`, or `Off` |
 | `ZSTD_LEVEL` | `19` | Zstd compression level (1-22) |
 | `JOBS` | auto | Parallel build jobs (auto-detected from RAM) |
-| `CLANG_VENDOR` | `Cyrene Clang` | Vendor string in clang version output |
-| `INSTALL_DIR` | `~/toolchains/cyrene` | Where to install the toolchain |
+| `CLANG_VENDOR` | `Oronyx Clang` | Vendor string in clang version output |
+| `INSTALL_DIR` | `~/toolchains/oronyx` | Where to install the toolchain |
+| `LLVM_SOURCE` | `upstream` | LLVM repo source: `upstream` (GitHub) or `android` (AOSP fork) |
 
 ### Benchmark Environment Variables
 
 | Variable | Default | Description |
 |---|---|---|
-| `CYRENE_DIR` | `~/toolchains/cyrene` | Path to installed Cyrene Clang toolchain |
+| `ORONYX_DIR` | `~/toolchains/oronyx` | Path to installed Oronyx Clang toolchain |
 | `KERNEL_SOURCE` | auto-clone | Kernel source directory for benchmark |
 | `RUNS` | `3` | Number of iterations per configuration |
 | `ARCH` | `arm64` | Target architecture |
 
 ## Building Older LLVM Versions
 
-Cyrene Clang supports building LLVM 14 and newer:
+Oronyx Clang supports building LLVM 14 and newer:
 
 ```bash
 # Build LLVM 15
@@ -340,7 +341,7 @@ bash scripts/check-compat.sh ~/kernel/msm-5.15
 A: Use `--lto=off` for kernels < 5.10 or `--lto=thin` for newer kernels.
 
 **Q: How to verify installation?**
-A: Run `clang --version` — should show `Cyrene Clang` vendor string.
+A: Run `clang --version` — should show `Oronyx Clang` vendor string.
 
 **Q: Can I build for older kernels (4.14)?**
 A: Yes. Use `--lto=off` and the kernel presets in `config/kernels/`.

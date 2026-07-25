@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CyreneClang — Patch Application Script
+# OronyxClang — Patch Application Script
 # Applies all patches from patches/ directory to the LLVM source tree.
 set -euo pipefail
 

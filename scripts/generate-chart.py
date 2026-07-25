@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cyrene Clang — Benchmark Chart Generator
+"""Oronyx Clang — Benchmark Chart Generator
 Generates multi-panel SVG chart from benchmark results.
 Metrics: Compile Time, Binary Size, Peak Memory
 Usage: python3 generate-chart.py results.json output.svg
@@ -59,7 +59,7 @@ def generate_svg(results, output_path):
 </defs>
 <rect width="{WIDTH}" height="{total_h}" fill="url(#bg)" rx="12"/>
 <text x="{WIDTH//2}" y="30" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, sans-serif" font-size="16" font-weight="bold">
-  Cyrene Clang {results[0].get('version','')} Benchmark
+  Oronyx Clang {results[0].get('version','')} Benchmark
 </text>
 ''']
 

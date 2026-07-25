@@ -1,4 +1,4 @@
-# AGENTS.md — Cyrene Clang
+# AGENTS.md — Oronyx Clang
 
 Custom LLVM/Clang 18.x toolchain optimized for Android kernel compilation. PGO, ThinLTO, BOLT, Polly.
 
@@ -76,7 +76,7 @@ Custom LLVM/Clang 18.x toolchain optimized for Android kernel compilation. PGO, 
 
 ```json
 {
-  "project_name": "Cyrene Clang",
+  "project_name": "Oronyx Clang",
   "project_type": "compiler",
   "primary_languages": ["C++", "Shell", "Python"],
   "ci_cd_platform": "github-actions",

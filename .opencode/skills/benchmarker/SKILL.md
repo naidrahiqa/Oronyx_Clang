@@ -1,7 +1,7 @@
-# Benchmarker - Cyrene Clang
+# Benchmarker - Oronyx Clang
 
 ## Overview
-Benchmarks the Cyrene Clang toolchain performance against stored baselines in `config/baseline.json`. Measures build time, binary size, compile speed (kernel builds), and code generation quality. Generates comparison reports with regression detection (>5% delta triggers warning).
+Benchmarks the Oronyx Clang toolchain performance against stored baselines in `config/baseline.json`. Measures build time, binary size, compile speed (kernel builds), and code generation quality. Generates comparison reports with regression detection (>5% delta triggers warning).
 
 ## Core Responsibilities
 - Run `bash scripts/benchmark.sh` to measure compiler performance

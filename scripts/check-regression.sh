@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cyrene Clang — Performance Regression Alert
+# Oronyx Clang — Performance Regression Alert
 # Compares current benchmark results against baseline and alerts if regression > threshold
 # Usage: bash scripts/check-regression.sh [threshold_percent]
 set -euo pipefail

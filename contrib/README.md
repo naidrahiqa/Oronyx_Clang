@@ -6,8 +6,8 @@ See [docs/CONTRIBUTING.md](../docs/CONTRIBUTING.md) for the full contribution gu
 
 ```bash
 # Fork and clone
-git clone https://github.com/YOUR_USERNAME/cyrene_clang
-cd cyrene_clang
+git clone https://github.com/YOUR_USERNAME/Oronyx_Clang
+cd Oronyx_Clang
 
 # Create feature branch
 git checkout -b feature/my-feature

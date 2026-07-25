@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# CyreneClang — Kernel ThinLTO Helper
+# OronyxClang — Kernel ThinLTO Helper
 # Source or run before your kernel make invocation to set up ThinLTO.
 # Usage: source scripts/kernel-lto.sh [kernel-source-dir]
 set -euo pipefail
 
-CYRENE_ROOT="${CYRENE_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
-MANIFEST="$CYRENE_ROOT/clang-version.txt"
+ORONYX_ROOT="${ORONYX_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+MANIFEST="$ORONYX_ROOT/clang-version.txt"
 KERNEL_DIR="${1:-}"
 
 log() { echo -e "\033[1;34m[Kernel-LTO]\033[0m $*"; }
@@ -15,7 +15,7 @@ warn() { echo -e "\033[1;33m[WARN]\033[0m $*" >&2; }
 check_bins() {
   for bin in clang ld.lld llvm-ar llvm-nm llvm-objcopy llvm-objdump; do
     if ! command -v "$bin" &>/dev/null; then
-      echo "[ERROR] $bin not found in PATH. Export CyreneClang bin directory first." >&2
+      echo "[ERROR] $bin not found in PATH. Export OronyxClang bin directory first." >&2
       return 1
     fi
   done
@@ -52,7 +52,7 @@ detect_kernel_version() {
 
 # ─── Main ────────────────────────────────────────────────────────────────
 main() {
-  log "CyreneClang Kernel LTO Setup"
+  log "OronyxClang Kernel LTO Setup"
 
   check_bins || return 1
   parse_manifest

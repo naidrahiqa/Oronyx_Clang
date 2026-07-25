@@ -1,12 +1,12 @@
-# CyreneClang — Master Project Reference
+# OronyxClang — Master Project Reference
 
-> Baca file ini **sebelum apapun** di setiap sesi yang berkaitan dengan CyreneClang.
+> Baca file ini **sebelum apapun** di setiap sesi yang berkaitan dengan OronyxClang.
 
 ---
 
 ## Gambaran Proyek
 
-- **Repo**: `naidrahiqa/cyrene_clang`, branch `main`
+- **Repo**: `naidrahiqa/Oronyx_Clang`, branch `main`
 - **Tujuan**: Custom LLVM/Clang toolchain untuk Android kernel compilation
 - **Status**: Masih dalam development — belum diintegrasikan ke kernel production manapun
 
@@ -30,7 +30,7 @@
 ## Struktur File Kritis
 
 ```
-cyrene_clang/
+Oronyx_Clang/
 ├── .github/workflows/build.yml   # Pipeline CI — jangan hardcode flag di sini
 ├── scripts/
 │   ├── build.sh                  # CMake configure + 2-stage PGO — semua flag di sini
@@ -39,7 +39,7 @@ cyrene_clang/
 │   ├── notify.sh                 # Telegram notification
 │   └── kernel-lto.sh             # Helper ThinLTO untuk kernel
 ├── patches/                      # Format: NNNN-deskripsi.patch (git format-patch style)
-└── docs/SKILL_CYRENE.md          # File ini
+└── docs/SKILL_ORONYX.md          # File ini
 ```
 
 ---

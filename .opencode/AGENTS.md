@@ -1,6 +1,6 @@
-# 🤖 AGENTS.md — Cyrene Clang Team Orchestrator
+# 🤖 AGENTS.md — Oronyx Clang Team Orchestrator
 
-> **Version:** 1.0.0 | **Last Updated:** 2026-06-29 | **Project:** Cyrene Clang v22.1.0
+> **Version:** 1.0.0 | **Last Updated:** 2026-06-29 | **Project:** Oronyx Clang v22.1.0
 
 ---
 
@@ -26,7 +26,7 @@
 ## 🔧 Skills Inventory
 
 ### Skill 1: Compiler Build Optimizer
-- **File**: `skills/Cyrene-clang/SKILL.md`
+- **File**: `skills/Oronyx-clang/SKILL.md`
 - **ID**: `compiler-build-optimizer`
 - **Responsibility**: Manage PGO, ThinLTO, BOLT, Polly optimization for LLVM/Clang 22.1.0 toolchain builds
 - **Triggers**: `push_to_main`, `pr_opened`, `schedule_daily`, `tag_created`
@@ -38,7 +38,7 @@
 - **Checks**: CHK-001 (Build validation), CHK-002 (LLVM version), CHK-003 (PGO profiles), CHK-004 (ThinLTO cache), CHK-005 (Benchmark), CHK-006 (Docker build), CHK-007 (Bitcode IR), CHK-008 (BOLT instrumentation)
 
 ### Skill 2: Master Project Reference
-- **File**: `skills/cyrene/SKILL.MD`
+- **File**: `skills/oronyx/SKILL.MD`
 - **ID**: `master-reference`
 - **Responsibility**: Provide complete project context — repo URL, build stack, CI constraints, known issues, commit conventions
 - **Triggers**: `session_start`, `before_any_task`, `context_needed`
@@ -599,9 +599,9 @@ opencode-agent session init --quick
 
 ```yaml
 team:
-  name: "Cyrene Clang Development Team"
+  name: "Oronyx Clang Development Team"
   size: 3
-  project: "Cyrene Clang v22.1.0"
+  project: "Oronyx Clang v22.1.0"
   leads: ["@lead"]
 
 skills:
@@ -646,10 +646,10 @@ notifications:
     channels: [telegram, github-issue, email]
     recipients:
       telegram: "@technical_lead"
-      email: ["lead@cyrene-clang.dev"]
+      email: ["lead@oronyx-clang.dev"]
     message_template: |
       🚨 CRITICAL: {issue_count} issue(s) found in {workflow}
-      Project: Cyrene Clang v22.1.0
+      Project: Oronyx Clang v22.1.0
       Findings: {findings_summary}
       Action required immediately.
 
@@ -844,7 +844,7 @@ opencode-agent workflow run pr-review --pr 123
 
 # Expected PR comment output:
 # ┌─────────────────────────────────────┐
-# │  🤖 PR Review #123 — Cyrene Clang  │
+# │  🤖 PR Review #123 — Oronyx Clang  │
 # ├─────────────────────────────────────┤
 # │ Build: ✅ PASS (v22.1.0)           │
 # │ Audit: 88/100                       │
@@ -870,7 +870,7 @@ opencode-agent workflow run release-build --tag v22.2.0-rc1
 # ✅ Security audit: PASS (0 critical, 2 high — filed as issues)
 # ✅ Full build: PASS (PGO + ThinLTO + BOLT)
 # ✅ Benchmark: +2.1% vs v22.1.0
-# ✅ Package: cyrene-clang-v22.2.0-rc1.tar.zst (612MB)
+# ✅ Package: oronyx-clang-v22.2.0-rc1.tar.zst (612MB)
 # 🚀 GitHub Release created: v22.2.0-rc1
 # 📨 Telegram notification sent
 ```
@@ -1032,8 +1032,8 @@ opencode-agent test workflow pr-review \
 
 | Skill ID | Path |
 |----------|------|
-| `master-reference` | `.opencode/skills/cyrene/SKILL.MD` |
-| `compiler-build-optimizer` | `.opencode/skills/Cyrene-clang/SKILL.md` |
+| `master-reference` | `.opencode/skills/oronyx/SKILL.MD` |
+| `compiler-build-optimizer` | `.opencode/skills/Oronyx-clang/SKILL.md` |
 | `universal-audit` | `.opencode/skills/audit/SKILL.md` |
 | `security-auditor` | `.opencode/skills/security/SKILL.md` |
 | `refactoring-engine` | `.opencode/skills/refactoring/SKILL.md` |
@@ -1053,7 +1053,7 @@ opencode-agent test workflow pr-review \
 
 ---
 
-> **AGENTS.md v1.0.0** — Generated for Cyrene Clang Development Team
+> **AGENTS.md v1.0.0** — Generated for Oronyx Clang Development Team
 >
 > Skills: 10 registered | Workflows: 5 defined | Team Roles: 3
 >

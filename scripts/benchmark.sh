@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cyrene Clang — Benchmark Script
+# Oronyx Clang — Benchmark Script
 # Measures compile time, binary size, and memory usage.
 # Output: benchmark/results.json + benchmark/chart.svg
 set -euo pipefail
@@ -10,7 +10,7 @@ BENCH_DIR="$REPO_DIR/benchmark"
 RESULTS="$BENCH_DIR/results.json"
 
 # Config
-CYRENE_DIR="${CYRENE_DIR:-$HOME/toolchains/cyrene}"
+ORONYX_DIR="${ORONYX_DIR:-$HOME/toolchains/oronyx}"
 KERNEL_SOURCE="${KERNEL_SOURCE:-}"
 RUNS="${RUNS:-3}"
 ARCH="${ARCH:-arm64}"
@@ -21,7 +21,7 @@ die() { echo -e "\033[1;31m[ERROR]\033[0m $*" >&2; exit 1; }
 mkdir -p "$BENCH_DIR"
 
 # ─── Validate ────────────────────────────────────────────────────────────────
-[[ -x "$CYRENE_DIR/bin/clang" ]] || die "Cyrene Clang not found at $CYRENE_DIR/bin/clang"
+[[ -x "$ORONYX_DIR/bin/clang" ]] || die "Oronyx Clang not found at $ORONYX_DIR/bin/clang"
 
 if [[ -z "$KERNEL_SOURCE" ]]; then
   # Auto-clone minimal kernel for benchmark
@@ -37,7 +37,7 @@ fi
 [[ -d "$KERNEL_SOURCE" ]] || die "Kernel source not found at $KERNEL_SOURCE"
 
 # ─── Detect toolchain version ───────────────────────────────────────────────
-CLANG_BIN="$CYRENE_DIR/bin/clang"
+CLANG_BIN="$ORONYX_DIR/bin/clang"
 CLANG_VERSION=$("$CLANG_BIN" --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 VENDOR=$("$CLANG_BIN" --version | head -1 | awk '{print $1}')
 log "Toolchain: $VENDOR $CLANG_VERSION"
@@ -140,7 +140,7 @@ run_benchmark() {
 }
 
 # ─── Run benchmarks ─────────────────────────────────────────────────────────
-log "=== Cyrene Clang Benchmark ==="
+log "=== Oronyx Clang Benchmark ==="
 log "Kernel: $KERNEL_SOURCE"
 log "Runs per config: $RUNS"
 echo "" >&2

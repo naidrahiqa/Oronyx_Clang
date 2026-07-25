@@ -1,11 +1,11 @@
-# CyreneClang Toolchain — Quick Reference
+# OronyxClang Toolchain — Quick Reference
 
 **Current**: Clang 22.1.0 | Build #54 | `llvmorg-22.1.0` | 672M compressed
 
 ## Struktur
 
 ```
-cyrene-clang/
+oronyx-clang/
 ├── .github/workflows/
 │   ├── build.yml              # Main build pipeline (build + package + release)
 │   └── sync-patches.yml       # Auto-sync LLVM patches
@@ -46,7 +46,7 @@ Android 16 uses kernel **6.12** (GKI 2.0). Key requirements:
 - **CFI** (Control Flow Integrity) support for security
 - **16 KB page size** alignment for memory optimization
 
-CyreneClang 22.1.0 fully supports all Android 16 kernel build requirements.
+OronyxClang 22.1.0 fully supports all Android 16 kernel build requirements.
 
 ## Patch Workflow
 

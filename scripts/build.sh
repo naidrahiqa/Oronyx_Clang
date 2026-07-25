@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
-# CyreneClang — Core Build Script
+# OronyxClang — Core Build Script
 # Performs a 2-stage PGO + ThinLTO Clang build targeting Android kernels.
 set -euo pipefail
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 LLVM_BRANCH="${LLVM_BRANCH:-llvmorg-22.1.0}"
-INSTALL_DIR="${INSTALL_DIR:-$HOME/toolchains/cyrene}"
+LLVM_SOURCE="${LLVM_SOURCE:-upstream}"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/toolchains/oronyx}"
 BUILD_DIR="${BUILD_DIR:-$(pwd)/build}"
 LLVM_DIR="${LLVM_DIR:-$(pwd)/llvm-project}"
 ENABLE_PGO="${ENABLE_PGO:-true}"
 ENABLE_BOLT="${ENABLE_BOLT:-true}"
 PGO_WORKLOAD="${PGO_WORKLOAD:-sqlite}"
 LTO_MODE="${LTO_MODE:-Thin}"
-ZSTD_LEVEL="${ZSTD_LEVEL:-19}"
+ZSTD_LEVEL="${ZSTD_LEVEL:-19}"}
 
 # Memory-aware job scaling
 if [[ -z "${JOBS:-}" ]]; then
@@ -39,7 +40,7 @@ fi
 LLVM_TARGETS="AArch64;ARM"
 LLVM_PROJECTS="clang;lld;compiler-rt;polly"
 LLVM_RUNTIMES=""
-CLANG_VENDOR="${CLANG_VENDOR:-Cyrene Clang}"
+CLANG_VENDOR="${CLANG_VENDOR:-Oronyx Clang}"
 DEFAULT_TARGET_TRIPLE="${DEFAULT_TARGET_TRIPLE:-aarch64-linux-android}"
 
 # ─── Host Compiler Detection ──────────────────────────────────────────────
@@ -88,7 +89,7 @@ detect_host_compiler() {
 }
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
-log() { echo -e "\n\033[1;36m[CyreneClang]\033[0m $*"; }
+log() { echo -e "\n\033[1;36m[OronyxClang]\033[0m $*"; }
 warn() { echo -e "\033[1;33m[WARN]\033[0m $*" >&2; }
 die() { echo -e "\033[1;31m[ERROR]\033[0m $*" >&2; exit 1; }
 
@@ -201,10 +202,26 @@ clone_llvm() {
     log "LLVM already cloned, skipping."
     return
   fi
-  log "Cloning LLVM (branch: $LLVM_BRANCH) ..."
+
+  local repo_url
+  case "$LLVM_SOURCE" in
+    android)
+      repo_url="https://android.googlesource.com/toolchain/llvm-project"
+      log "Cloning LLVM from Android fork (branch: $LLVM_BRANCH) ..."
+      ;;
+    upstream)
+      repo_url="https://github.com/llvm/llvm-project.git"
+      log "Cloning LLVM from upstream (branch: $LLVM_BRANCH) ..."
+      ;;
+    *)
+      repo_url="https://github.com/llvm/llvm-project.git"
+      log "Unknown LLVM_SOURCE='$LLVM_SOURCE', falling back to upstream"
+      ;;
+  esac
+
   local max_attempts=3
   for ((attempt=1; attempt<=max_attempts; attempt++)); do
-    if git clone https://github.com/llvm/llvm-project.git \
+    if git clone "$repo_url" \
       --depth=1 --branch "$LLVM_BRANCH" "$LLVM_DIR" 2>&1; then
       return 0
     fi
@@ -384,7 +401,7 @@ collect_sqlite() {
   local profile_dir="$BUILD_DIR/profiles"
   mkdir -p "$profile_dir"
 
-  export LLVM_PROFILE_FILE="$profile_dir/cyrene-%p.profraw"
+  export LLVM_PROFILE_FILE="$profile_dir/oronyx-%p.profraw"
 
   local workload_dir="$BUILD_DIR/workload"
   mkdir -p "$workload_dir"
@@ -418,7 +435,7 @@ collect_kernel() {
   local profile_dir="$BUILD_DIR/profiles"
   mkdir -p "$profile_dir"
 
-  export LLVM_PROFILE_FILE="$profile_dir/cyrene-%p.profraw"
+  export LLVM_PROFILE_FILE="$profile_dir/oronyx-%p.profraw"
 
   local kernel_dir="$BUILD_DIR/kernel-workload"
   log "Cloning android-mainline kernel (--depth=1) ..."
@@ -585,7 +602,7 @@ cleanup_stage1_artifacts() {
 
 # ─── Stage 2: Optimized Final Build ───────────────────────────────────────────
 stage2_build() {
-  log "Stage 2: Building optimized CyreneClang (LTO=$LTO_MODE) ..."
+  log "Stage 2: Building optimized OronyxClang (LTO=$LTO_MODE) ..."
   local s2_build="$BUILD_DIR/stage2"
 
   # Prepend Stage 1 bin to PATH so that CMake and Clang find lld, llvm-profdata, etc.
@@ -730,7 +747,7 @@ apply_bolt() {
 
 # ─── Simple Build (no PGO) ────────────────────────────────────────────────────
 simple_build() {
-  log "Building CyreneClang (no PGO, LTO=$LTO_MODE) ..."
+  log "Building OronyxClang (no PGO, LTO=$LTO_MODE) ..."
   local build="$BUILD_DIR/simple"
   local cc="" cxx=""
   local old_path="$PATH"
@@ -818,7 +835,7 @@ main() {
     fi
   fi
 
-  log "Starting CyreneClang build (PGO=$ENABLE_PGO, LTO=$LTO_MODE, JOBS=$JOBS) ..."
+  log "Starting OronyxClang build (PGO=$ENABLE_PGO, LTO=$LTO_MODE, JOBS=$JOBS) ..."
   mkdir -p "$BUILD_DIR"
 
   # Clone LLVM first — set commit AFTER clone so notification has correct info

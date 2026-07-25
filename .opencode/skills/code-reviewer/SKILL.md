@@ -1,14 +1,14 @@
-# Code Reviewer - Cyrene Clang
+# Code Reviewer - Oronyx Clang
 
 ## Overview
-Reviews all code contributions to Cyrene Clang: LLVM/Clang patches, build scripts (`scripts/`), CMake configuration (`config/`), Dockerfile, and Python utility scripts. Enforces LLVM coding standards, build reproducibility, and no regression in optimization flags.
+Reviews all code contributions to Oronyx Clang: LLVM/Clang patches, build scripts (`scripts/`), CMake configuration (`config/`), Dockerfile, and Python utility scripts. Enforces LLVM coding standards, build reproducibility, and no regression in optimization flags.
 
 ## Core Responsibilities
 - Review LLVM/Clang patches: verify `Signed-off-by`, commit message format per LLVM conventions
-- Review build scripts (`scripts/`): ensure POSIX shell, error handling, `CYRENE_CLANG_DIR` path safety
+- Review build scripts (`scripts/`): ensure POSIX shell, error handling, `ORONYX_CLANG_DIR` path safety
 - Review CMake config: verify `config/build.conf` flags don't break Android kernel target compilation
 - Review Dockerfile: ensure multi-stage build, cache efficiency, no hardcoded secrets
-- Enforce: Cyrene Clang must NEVER be added to `GITHUB_PATH` — use `CYRENE_CLANG_DIR` only
+- Enforce: Oronyx Clang must NEVER be added to `GITHUB_PATH` — use `ORONYX_CLANG_DIR` only
 - Verify no regression in `config/baseline.json` optimization metrics
 
 ## When This Skill Activates
@@ -21,7 +21,7 @@ Reviews all code contributions to Cyrene Clang: LLVM/Clang patches, build script
 - **Review targets**: LLVM patches, `scripts/*.sh`, `config/build.conf`, `Dockerfile`, `*.cmake`, `*.py`
 - **Tools**: `git-clang-format`, `shellcheck`, `cmake-format`, `hadolint` (Dockerfile lint)
 - **Standards**: LLVM coding style (`clang-format`); POSIX shell; Docker best practices; CMake conventions
-- **Key constraints**: `GITHUB_PATH` forbidden for Cyrene; `CYRENE_CLANG_DIR` must be used
+- **Key constraints**: `GITHUB_PATH` forbidden for Oronyx; `ORONYX_CLANG_DIR` must be used
 
 ## Automated Checks
 ```yaml
@@ -67,6 +67,6 @@ checks:
 
 ## Error Recovery
 - **LLVM style violation**: Run `git clang-format HEAD~1` to auto-fix formatting before merge
-- **GITHUB_PATH found**: Replace with `CYRENE_CLANG_DIR` environment variable; update all scripts referencing Cyrene
+- **GITHUB_PATH found**: Replace with `ORONYX_CLANG_DIR` environment variable; update all scripts referencing Oronyx
 - **Hadolint warnings**: Fix Dockerfile best practices (pin base image version, use multi-stage, avoid `latest` tag)
 - **ShellCheck errors**: Fix unquoted variables, missing `set -e`, or unsafe `eval` usage in `scripts/`

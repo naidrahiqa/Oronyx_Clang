@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cyrene Clang — Auto Sync Patches from LLVM Stable
+# Oronyx Clang — Auto Sync Patches from LLVM Stable
 # Automatically finds relevant commits between current LLVM version
 # and latest stable release, then generates .patch files.
 set -euo pipefail

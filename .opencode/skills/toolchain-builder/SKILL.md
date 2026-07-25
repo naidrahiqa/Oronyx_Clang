@@ -1,15 +1,15 @@
-# Toolchain Builder (LLVM/Clang) - Cyrene Clang
+# Toolchain Builder (LLVM/Clang) - Oronyx Clang
 
 ## Overview
-Builds the custom Cyrene Clang toolchain (LLVM/Clang 18.x) from source, optimized for Android kernel compilation. Manages the full build pipeline: CMake configuration, stage1/stage2 bootstrap, LLVM runtimes, and Docker-based reproducible builds. Produces the compiler artifact at `build/stage2/bin/clang`.
+Builds the custom Oronyx Clang toolchain (LLVM/Clang 18.x) from source, optimized for Android kernel compilation. Manages the full build pipeline: CMake configuration, stage1/stage2 bootstrap, LLVM runtimes, and Docker-based reproducible builds. Produces the compiler artifact at `build/stage2/bin/clang`.
 
 ## Core Responsibilities
 - Run `bash scripts/build.sh` with config from `config/build.conf`
 - Manage CMake build: stage1 (host gcc bootstrap) → stage2 (self-hosted clang)
 - Build LLVM runtimes: `compiler-rt`, `libunwind`, `libcxx`, `libcxxabi`
 - Configure `LLVM_TARGETS_TO_BUILD` for AArch64, ARM, X86 (Android kernel targets)
-- Build Docker image: `docker build -t cyrene-clang .`
-- Verify output: `build/stage1/bin/clang --version` reports `Cyrene-Clang 18.x`
+- Build Docker image: `docker build -t oronyx-clang .`
+- Verify output: `build/stage1/bin/clang --version` reports `Oronyx-Clang 18.x`
 
 ## When This Skill Activates
 | Trigger | Event | Condition |
@@ -23,7 +23,7 @@ Builds the custom Cyrene Clang toolchain (LLVM/Clang 18.x) from source, optimize
 - **Build**: CMake 3.25+, Ninja, GNU Make, Docker, `ccache`
 - **Targets**: AArch64, ARM, X86 (LLVM_TARGETS_TO_BUILD)
 - **Key files**: `scripts/build.sh`, `config/build.conf`, `Dockerfile`, `Makefile`
-- **Constraints**: Cyrene Clang must NOT be added to GITHUB_PATH; use `CYRENE_CLANG_DIR` instead
+- **Constraints**: Oronyx Clang must NOT be added to GITHUB_PATH; use `ORONYX_CLANG_DIR` instead
 
 ## Automated Checks
 ```yaml
@@ -52,8 +52,8 @@ checks:
   - id: "TCB-004"
     name: "Docker Build"
     command: |
-      docker build -t cyrene-clang:latest . 2>&1 | tail -3
-      docker run --rm cyrene-clang:latest clang --version | grep -q "Cyrene-Clang 18" && echo "DOCKER_OK"
+      docker build -t oronyx-clang:latest . 2>&1 | tail -3
+      docker run --rm oronyx-clang:latest clang --version | grep -q "Oronyx-Clang 18" && echo "DOCKER_OK"
     severity: "critical"
 ```
 

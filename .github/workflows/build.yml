@@ -1,6 +1,8 @@
-name: Build CyreneClang
+name: Build OronyxClang
 
 on:
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight UTC
   workflow_dispatch:
     inputs:
       llvm_branch:
@@ -18,6 +20,9 @@ on:
         description: 'Enable BOLT post-build optimization'
         type: boolean
         default: false
+      llvm_source:
+        description: 'LLVM source: upstream (GitHub) or android (AOSP fork)'
+        default: 'upstream'
       release:
         description: 'Publish to GitHub Releases'
         type: boolean
@@ -44,7 +49,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  LLVM_BRANCH: ${{ github.event.inputs.llvm_branch || github.event.client_payload.llvm_branch || 'llvmorg-22.1.8' }}
+  # Schedule builds track main branch (rolling); dispatch can override
+  LLVM_BRANCH: ${{ github.event.inputs.llvm_branch || github.event.client_payload.llvm_branch || 'main' }}
+  LLVM_SOURCE: ${{ github.event.inputs.llvm_source || 'upstream' }}
   ENABLE_PGO: ${{ github.event.inputs.enable_pgo || 'false' }}
   ENABLE_BOLT: ${{ github.event.inputs.enable_bolt || 'false' }}
   PGO_WORKLOAD: ${{ github.event.inputs.pgo_workload || 'sqlite' }}
@@ -52,13 +59,13 @@ env:
   BUILD_DIR: ${{ github.workspace }}/build
   LLVM_DIR: ${{ github.workspace }}/llvm-project
   OUTPUT_DIR: ${{ github.workspace }}/output
-  RELEASE_TAG: cyrene-placeholder
+  RELEASE_TAG: oronyx-placeholder
   TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
   TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
 jobs:
   build:
-    name: Build CyreneClang
+    name: Build OronyxClang
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
@@ -70,11 +77,17 @@ jobs:
       - name: Set release tag from LLVM branch
         run: |
           BRANCH="${{ env.LLVM_BRANCH }}"
-          # llvmorg-22.1.0 → 22.1.0, llvmorg-22.1.0-rc1 → 22.1.0-rc1
-          VERSION=$(echo "$BRANCH" | sed 's/^llvmorg-//')
+          DATE_COMPACT=$(date -u +%Y%m%d)
+          if [[ "$BRANCH" == "main" ]]; then
+            # Rolling build: use date as tag
+            VERSION="$DATE_COMPACT"
+          else
+            # llvmorg-22.1.0 → 22.1.0, llvmorg-22.1.0-rc1 → 22.1.0-rc1
+            VERSION=$(echo "$BRANCH" | sed 's/^llvmorg-//')
+          fi
           echo "RELEASE_TAG=${VERSION}" >> "$GITHUB_ENV"
-          echo "CYRENE_VERSION=${VERSION}" >> "$GITHUB_ENV"
-          echo "Release tag: cyrene-${VERSION}"
+          echo "ORONYX_VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "Release tag: oronyx-${VERSION}"
 
       - name: Count patches
         run: echo "PATCH_COUNT=$(ls -1 patches/*.patch 2>/dev/null | wc -l)" >> "$GITHUB_ENV"
@@ -270,10 +283,12 @@ jobs:
       - name: Upload toolchain artifact
         uses: actions/upload-artifact@v5
         with:
-          name: cyrene-clang-${{ env.CYRENE_VERSION }}
+          name: oronyx-clang-${{ env.ORONYX_VERSION }}
           path: |
-            ${{ env.OUTPUT_DIR }}/cyrene-clang-*.tar.zst
+            ${{ env.OUTPUT_DIR }}/oronyx-clang-*.tar.zst
             ${{ env.OUTPUT_DIR }}/clang-version.txt
+            get_latest_url.sh
+            latest.txt
           retention-days: 7
 
       # ── Release ──────────────────────────────────────────────────────────────
@@ -291,23 +306,29 @@ jobs:
           # Generate changelog
           CHANGELOG=$(bash scripts/generate-changelog.sh "" "$RELEASE_TAG" 2>/dev/null || echo "Automated build for $RELEASE_TAG")
           
-          RELEASE_BODY="## CyreneClang — Automated Build
+          # Read LLVM commit message from changelog
+          LLVM_COMMIT_MSG_HUMAN=""
+          [[ -f "output/changelog.txt" ]] && LLVM_COMMIT_MSG_HUMAN=$(grep 'LLVM repo commit:' output/changelog.txt 2>/dev/null | head -1 || echo "")
 
-          **LLVM Branch**: \`${{ env.LLVM_BRANCH }}\`
-          **PGO**: ${{ env.ENABLE_PGO }}
-          **LTO**: ThinLTO
-          **Targets**: AArch64, ARM, X86
+          RELEASE_BODY="Oronyx Clang $RELEASE_TAG
 
-          ### What's Changed
-          $CHANGELOG
+          LLVM: ${{ env.LLVM_BRANCH }}
+          PGO: ${{ env.ENABLE_PGO }} | LTO: ThinLTO | Target: AArch64/ARM/X86
 
-          ### Integration
+          ---
+
+          Cara pasang:
           \`\`\`bash
-          wget \$(grep DOWNLOAD_URL output/clang-version.txt | cut -d= -f2)
-          tar -I zstd -xf cyrene-clang-*.tar.zst -C \$HOME/toolchains/
-          export PATH=\"\$HOME/toolchains/cyrene/bin:\$PATH\"
-          make CC=clang LD=ld.lld AR=llvm-ar ...
-          \`\`\`"
+          bash <(wget -qO- https://raw.githubusercontent.com/naidrahiqa/Oronyx_Clang/main/get_clang.sh)
+          \`\`\`
+
+          Atau manual:
+          \`\`\`bash
+          URL=\$(wget -qO- https://raw.githubusercontent.com/naidrahiqa/Oronyx_Clang/main/latest.txt)
+          wget \"\$URL\"
+          tar -I zstd -xf oronyx-clang-*.tar.zst -C ~/toolchains/
+          export PATH=\"~/toolchains/oronyx/bin:\$PATH\"
+          \`\`\``"
 
           # Delete existing release if it exists (rebuild scenario)
           gh release delete "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true
@@ -315,11 +336,24 @@ jobs:
 
           gh release create "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
-            --title "Cyrene Clang $RELEASE_TAG" \
+            --title "Oronyx Clang $RELEASE_TAG" \
             --notes "$RELEASE_BODY" \
             --latest \
             "$TARBALL" \
-            "${{ env.OUTPUT_DIR }}/clang-version.txt"
+            "${{ env.OUTPUT_DIR }}/clang-version.txt" \
+            "get_latest_url.sh" \
+            "latest.txt"
+
+      # ── Commit metadata to repo ───────────────────────────────────────────────
+      - name: Commit metadata files
+        if: ${{ github.event.inputs.release == 'true' || github.event_name == 'repository_dispatch' || github.event_name == 'push' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add get_latest_url.sh latest.txt clang-version.txt
+          git diff --cached --quiet || git commit -m "chore: update release metadata [skip ci]"
+          git pull --rebase
+          git push
 
       # ── Benchmark ─────────────────────────────────────────────────────────────
       - name: Run benchmark
@@ -328,7 +362,7 @@ jobs:
           chmod +x scripts/benchmark.sh scripts/generate-chart.py
           bash scripts/benchmark.sh
         env:
-          CYRENE_DIR: ${{ env.INSTALL_DIR }}
+          ORONYX_DIR: ${{ env.INSTALL_DIR }}
           RUNS: 3
 
       - name: Check performance regression
