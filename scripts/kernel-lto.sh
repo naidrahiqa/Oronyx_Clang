@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-# OronyxClang — Kernel ThinLTO Helper
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  DEPRECATED: Use kernel-build.sh instead                        ║
+# ║  kernel-build.sh --lto=thin replaces this script entirely.      ║
+# ║  This file will be removed in a future release.                 ║
+# ╚══════════════════════════════════════════════════════════════════╝
+# OronyxClang — Kernel ThinLTO Helper (DEPRECATED)
 # Source or run before your kernel make invocation to set up ThinLTO.
 # Usage: source scripts/kernel-lto.sh [kernel-source-dir]
 set -euo pipefail
@@ -52,6 +57,7 @@ detect_kernel_version() {
 
 # ─── Main ────────────────────────────────────────────────────────────────
 main() {
+  echo -e "\033[1;33m[DEPRECATED]\033[0m kernel-lto.sh is deprecated. Use kernel-build.sh --lto=thin instead." >&2
   log "OronyxClang Kernel LTO Setup"
 
   check_bins || return 1

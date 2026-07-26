@@ -46,7 +46,6 @@ permissions:
 
 concurrency:
   group: build-${{ github.ref }}
-  cancel-in-progress: true
 
 env:
   # Schedule builds track main branch (rolling); dispatch can override

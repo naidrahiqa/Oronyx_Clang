@@ -1,7 +1,7 @@
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV LLVM_BRANCH=llvmorg-22.1.0
+ENV LLVM_BRANCH=llvmorg-22.1.8
 ENV ENABLE_PGO=false
 ENV ENABLE_BOLT=false
 

@@ -81,10 +81,22 @@ ok "Directory ready"
 
 # ─── [4/6] Download & extract ────────────────────────────────────────────────
 info 4 "Downloading and extracting ..."
-if wget -qO- "$LATEST_URL" | tar -I zstd -xf - -C "$INSTALL_DIR" --strip-components=1; then
+TMPFILE="$(mktemp /tmp/oronyx-clang-XXXXXX.tar.zst)"
+trap 'rm -f "$TMPFILE"' EXIT
+
+if ! wget -qO "$TMPFILE" "$LATEST_URL"; then
+  fail "Download failed"
+fi
+
+# Verify archive integrity before extraction
+if ! tar -I zstd -tf "$TMPFILE" >/dev/null 2>&1; then
+  fail "Downloaded archive is corrupted or not a valid zstd tar"
+fi
+
+if tar -I zstd -xf "$TMPFILE" -C "$INSTALL_DIR" --strip-components=1; then
   ok "Download and extraction complete"
 else
-  fail "Download or extraction failed"
+  fail "Extraction failed"
 fi
 
 # ─── [5/6] Fix ld symlink ────────────────────────────────────────────────────

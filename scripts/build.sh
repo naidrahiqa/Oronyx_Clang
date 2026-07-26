@@ -407,9 +407,18 @@ collect_sqlite() {
   mkdir -p "$workload_dir"
 
   log "Downloading SQLite amalgamation ..."
-  if ! curl -sSL https://www.sqlite.org/2024/sqlite-amalgamation-3460000.zip \
-    -o "$workload_dir/sqlite.zip"; then
+  local sqlite_url="https://www.sqlite.org/2024/sqlite-amalgamation-3460000.zip"
+  local sqlite_sha256="712a7d09d2a22652fb06a49af516e051979a3984adb067da86760e60ed51a7f5"
+  if ! curl -sSL "$sqlite_url" -o "$workload_dir/sqlite.zip"; then
     warn "SQLite download failed"
+    return 1
+  fi
+
+  log "Verifying SQLite checksum ..."
+  local actual_sha256
+  actual_sha256=$(sha256sum "$workload_dir/sqlite.zip" | cut -d' ' -f1)
+  if [[ "$actual_sha256" != "$sqlite_sha256" ]]; then
+    warn "SQLite checksum mismatch (expected $sqlite_sha256, got $actual_sha256)"
     return 1
   fi
 
