@@ -82,9 +82,16 @@ fmt_kv_raw() { echo "$1 $2: $3"; }
 # ─── Message handlers ─────────────────────────────────────────────────────────
 case "$MESSAGE_TYPE" in
   started)
+    # Show readable LLVM version (e.g. llvmorg-22.1.8 → 22.1.8, main → Rolling)
+    if [[ "$LLVM_BRANCH" == "main" ]]; then
+      LLVM_VERSION="Rolling (main)"
+    else
+      LLVM_VERSION=$(echo "$LLVM_BRANCH" | sed 's/^llvmorg-//')
+    fi
+
     MSG="🔨 <b>Oronyx Clang Build #$RUN_NUMBER</b>
 ━━━━━━━━━━━━━━━━━━━━
-Branch: <code>$LLVM_BRANCH</code>
+LLVM: <code>$LLVM_VERSION</code>
 Commit: <code>${ORONYX_COMMIT:0:7}</code>
 PGO: $ENABLE_PGO | LTO: $LTO_MODE
 Targets: <code>$TARGETS</code>
@@ -120,9 +127,16 @@ Targets: <code>$TARGETS</code>
     fi
     ERROR_FIRST_LINE=$(escape_html "$ERROR_FIRST_LINE")
 
+    # Show readable LLVM version
+    if [[ "$LLVM_BRANCH" == "main" ]]; then
+      LLVM_VERSION="Rolling (main)"
+    else
+      LLVM_VERSION=$(echo "$LLVM_BRANCH" | sed 's/^llvmorg-//')
+    fi
+
     MSG="❌ <b>Oronyx Clang Build #$RUN_NUMBER</b>
 ━━━━━━━━━━━━━━━━━━━━
-Branch: <code>$LLVM_BRANCH</code>
+LLVM: <code>$LLVM_VERSION</code>
 Stage: <code>${BUILD_STAGE:-unknown}</code>
 Duration: <code>${BUILD_DURATION:-unknown}</code>"
 
@@ -154,9 +168,16 @@ Duration: <code>${BUILD_DURATION:-unknown}</code>"
     FULL_LOG=$(escape_html "$FULL_LOG")
     ERROR_FIRST_LINE=$(escape_html "$ERROR_FIRST_LINE")
 
+    # Show readable LLVM version
+    if [[ "$LLVM_BRANCH" == "main" ]]; then
+      LLVM_VERSION="Rolling (main)"
+    else
+      LLVM_VERSION=$(echo "$LLVM_BRANCH" | sed 's/^llvmorg-//')
+    fi
+
     MSG="🐛 <b>Build #$RUN_NUMBER Error Dump</b>
 ━━━━━━━━━━━━━━━━━━━━
-Branch: <code>$LLVM_BRANCH</code>
+LLVM: <code>$LLVM_VERSION</code>
 Stage: <code>${BUILD_STAGE:-unknown}</code>
 Duration: <code>${BUILD_DURATION:-unknown}</code>"
 
