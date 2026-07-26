@@ -359,7 +359,7 @@ jobs:
 
           ---
 
-          Signed-off-by: OronyxCI <OronyxCI@users.noreply.github.com>""
+          Signed-off-by: OronyxCI <OronyxCI@users.noreply.github.com>"
 
           # Delete existing release if it exists (rebuild scenario)
           gh release delete "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true
