@@ -81,9 +81,8 @@ jobs:
           git push
           
           # Trigger build workflow via repository_dispatch
-          gh api repos/${{ github.repository }}/dispatches \
-            -f event_type='new-llvm-release' \
-            --raw-field client_payload="{\"llvm_branch\":\"$LATEST\"}"
+          echo "{\"event_type\": \"new-llvm-release\", \"client_payload\": {\"llvm_branch\": \"$LATEST\"}}" | \
+            gh api repos/${{ github.repository }}/dispatches --input -
           
           echo "Build triggered for $LATEST"
         env:

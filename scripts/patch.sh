@@ -73,6 +73,24 @@ apply_nsan_gcc14_fallback() {
   return 1
 }
 
+# ─── Fallback: lld isPreemptible narrowing (LLVM main changed bool→uint8_t) ──
+apply_lld_ispreemptible_fallback() {
+  local reloc_cpp="$LLVM_DIR/lld/ELF/Relocations.cpp"
+  if [[ ! -f "$reloc_cpp" ]]; then
+    log "    ⏭ lld/ELF/Relocations.cpp not found"
+    return 1
+  fi
+  if grep -q '(bool)sym.isPreemptible' "$reloc_cpp"; then
+    log "    ✓ isPreemptible narrowing fix already applied"
+    return 0
+  fi
+  if sed -i 's/\(sym\.isPreemptible\)/(bool)\1/g' "$reloc_cpp"; then
+    log "    ✓ isPreemptible narrowing fix applied via fallback sed"
+    return 0
+  fi
+  return 1
+}
+
 # ─── Main patch loop ────────────────────────────────────────────────────────
 for patch in "$PATCHES_DIR"/*.patch; do
   patch_name="$(basename "$patch")"
@@ -100,6 +118,13 @@ for patch in "$PATCHES_DIR"/*.patch; do
       continue
     fi
     if apply_nsan_gcc14_fallback; then
+      continue
+    fi
+  fi
+
+  # lld isPreemptible narrowing fix (LLVM main branch: bool → uint8_t)
+  if [[ "$patch_name" == *"lld"*"ispreemptible"* || "$patch_name" == *"lld"*"narrowing"* ]]; then
+    if apply_lld_ispreemptible_fallback; then
       continue
     fi
   fi

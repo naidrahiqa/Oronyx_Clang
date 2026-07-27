@@ -114,6 +114,7 @@ jobs:
           LLVM_BRANCH="${{ steps.version.outputs.llvm_branch }}" \
           ENABLE_PGO="${{ inputs.enable_pgo }}" \
           ENABLE_BOLT="${{ inputs.enable_bolt }}" \
+          ZSTD_LEVEL=10 \
           bash scripts/build.sh
 
       - name: Package toolchain
@@ -121,6 +122,7 @@ jobs:
         run: bash scripts/package.sh
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
+          ZSTD_LEVEL: 10
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

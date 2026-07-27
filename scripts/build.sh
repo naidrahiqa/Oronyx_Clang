@@ -26,7 +26,7 @@ if [[ -z "${JOBS:-}" ]]; then
   fi
 
   if [[ "$TOTAL_RAM_GB" -lt 4 ]]; then
-    JOBS=$((TOTAL_RAM_GB * 2))
+    JOBS=$TOTAL_RAM_GB
   elif [[ "$TOTAL_RAM_GB" -lt 8 ]]; then
     JOBS=$((TOTAL_RAM_GB * 2))
   elif [[ "$TOTAL_RAM_GB" -lt 16 ]]; then
@@ -964,6 +964,12 @@ main() {
     } > "$metadata"
     log "Build metadata: $metadata"
 
+    # Capture LLVM commit info before deleting source tree
+    LLVM_COMMIT=$(git -C "$LLVM_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    LLVM_COMMIT_FULL=$(git -C "$LLVM_DIR" rev-parse HEAD 2>/dev/null || echo "unknown")
+    LLVM_COMMIT_MSG=$(git -C "$LLVM_DIR" log -1 --format="%s" 2>/dev/null || echo "Automated build")
+    export LLVM_COMMIT LLVM_COMMIT_FULL LLVM_COMMIT_MSG
+
     # Final cleanup: remove LLVM source tree to free disk space for packaging
     log "Cleaning up LLVM source tree ..."
     rm -rf "$LLVM_DIR"
@@ -977,6 +983,9 @@ main() {
 
 cleanup() {
   local exit_code=$?
+  if [[ "${NOTIFIED_FAILURE:-false}" == "true" ]]; then
+    return
+  fi
   if [[ $exit_code -ne 0 ]] && [[ -x "$NOTIFY_SCRIPT" ]]; then
     BUILD_DURATION=$(build_duration 2>/dev/null || echo "unknown")
 

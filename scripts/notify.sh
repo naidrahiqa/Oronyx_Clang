@@ -119,11 +119,11 @@ $DIVIDER
   failure)
     ERROR_FIRST_LINE=""
     if [[ -n "$ERROR_LOG" ]]; then
-      ERROR_FIRST_LINE=$(echo "$ERROR_LOG" | grep -i "error\|fatal\|failed" | head -1 | head -c 120)
+      ERROR_FIRST_LINE=$(echo "$ERROR_LOG" | grep -i "error\|fatal\|failed" | head -1)
     elif [[ -n "$ERROR_DUMP_FILE" && -f "$ERROR_DUMP_FILE" && -s "$ERROR_DUMP_FILE" ]]; then
-      ERROR_FIRST_LINE=$(grep -i "error\|fatal\|failed" "$ERROR_DUMP_FILE" 2>/dev/null | head -1 | head -c 120)
+      ERROR_FIRST_LINE=$(grep -i "error\|fatal\|failed" "$ERROR_DUMP_FILE" 2>/dev/null | head -1)
     fi
-    ERROR_FIRST_LINE=$(escape_html "$ERROR_FIRST_LINE")
+    ERROR_FIRST_LINE=$(escape_html "$ERROR_FIRST_LINE" | grep -oP '^.{0,120}')
 
     MSG="❌ <b>OronyxClang #$RUN_NUMBER</b>
 $DIVIDER
@@ -149,16 +149,16 @@ $DIVIDER
     ERROR_FIRST_LINE=""
     if [[ -n "$ERROR_LOG" ]]; then
       FULL_LOG="$ERROR_LOG"
-      ERROR_FIRST_LINE=$(echo "$ERROR_LOG" | grep -i "error\|fatal\|failed" | head -1 | head -c 150)
+      ERROR_FIRST_LINE=$(echo "$ERROR_LOG" | grep -i "error\|fatal\|failed" | head -1)
     fi
     if [[ -z "$FULL_LOG" && -n "$ERROR_DUMP_FILE" && -f "$ERROR_DUMP_FILE" && -s "$ERROR_DUMP_FILE" ]]; then
       # Last 40 lines to fit Telegram's 4096 char limit
       FULL_LOG=$(tail -40 "$ERROR_DUMP_FILE" 2>/dev/null || true)
-      ERROR_FIRST_LINE=$(grep -i "error\|fatal\|failed" "$ERROR_DUMP_FILE" 2>/dev/null | head -1 | head -c 150)
+      ERROR_FIRST_LINE=$(grep -i "error\|fatal\|failed" "$ERROR_DUMP_FILE" 2>/dev/null | head -1)
     fi
 
     FULL_LOG=$(escape_html "$FULL_LOG")
-    ERROR_FIRST_LINE=$(escape_html "$ERROR_FIRST_LINE")
+    ERROR_FIRST_LINE=$(escape_html "$ERROR_FIRST_LINE" | grep -oP '^.{0,150}')
 
     MSG="🐛 <b>Build #$RUN_NUMBER — Error Log</b>
 $DIVIDER

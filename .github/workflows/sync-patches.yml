@@ -23,10 +23,10 @@ jobs:
 
       - name: Clone LLVM with tags
         run: |
-          git clone --filter=blob:none --no-checkout https://github.com/llvm/llvm-project.git llvm-project
+          git clone --filter=blob:none https://github.com/llvm/llvm-project.git llvm-project
           cd llvm-project
           git fetch --tags --depth=1 origin "refs/tags/llvmorg-*:refs/tags/llvmorg-*" 2>/dev/null || true
-          git checkout HEAD 2>/dev/null || true
+          git checkout -q FETCH_HEAD 2>/dev/null || true
 
       - name: Run sync-patches
         run: bash scripts/sync-patches.sh

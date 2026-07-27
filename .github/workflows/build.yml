@@ -59,6 +59,7 @@ env:
   LLVM_DIR: ${{ github.workspace }}/llvm-project
   OUTPUT_DIR: ${{ github.workspace }}/output
   RELEASE_TAG: oronyx-placeholder
+  ZSTD_LEVEL: 10
   TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
   TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
@@ -72,6 +73,13 @@ jobs:
       # ── Prep ────────────────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v5
+
+      - name: Set LLVM branch from .llvm-version for scheduled builds
+        if: github.event_name == 'schedule'
+        run: |
+          BRANCH=$(cat .llvm-version 2>/dev/null | tr -d '[:space:]')
+          echo "LLVM_BRANCH=${BRANCH}" >> "$GITHUB_ENV"
+          echo "Using stable branch: ${BRANCH}"
 
       - name: Set release tag from LLVM branch
         run: |
@@ -274,6 +282,7 @@ jobs:
           bash scripts/package.sh
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
+          ZSTD_LEVEL: ${{ env.ZSTD_LEVEL }}
 
       - name: Show disk usage after build
         run: df -h
@@ -408,4 +417,5 @@ jobs:
         run: |
           if [[ "${NOTIFIED_FAILURE:-false}" != "true" ]]; then
             bash scripts/notify.sh failure
+            echo "NOTIFIED_FAILURE=true" >> "$GITHUB_ENV"
           fi

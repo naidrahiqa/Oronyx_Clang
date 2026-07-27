@@ -92,15 +92,15 @@ main() {
   # Ensure LLVM source is available
   if [[ ! -d "$LLVM_DIR/.git" ]]; then
     log "Cloning LLVM for commit lookup..."
-    git clone --filter=blob:none --no-checkout "$LLVM_REMOTE" "$LLVM_DIR"
-    # Fetch only the two tags we need (current + latest), not all tags
+    git clone --filter=blob:none "$LLVM_REMOTE" "$LLVM_DIR"
+    # Fetch only the tags we need (current + latest) — no depth limit so git log tag1..tag2 works
     if [[ "$current_version" != "main" ]]; then
-      git -C "$LLVM_DIR" fetch --depth=1 origin "refs/tags/$current_version:refs/tags/$current_version" 2>/dev/null || true
+      git -C "$LLVM_DIR" fetch origin "refs/tags/$current_version:refs/tags/$current_version" 2>/dev/null || true
     fi
     if [[ -n "$latest_release" && "$latest_release" != "$current_version" ]]; then
-      git -C "$LLVM_DIR" fetch --depth=1 origin "refs/tags/$latest_release:refs/tags/$latest_release" 2>/dev/null || true
+      git -C "$LLVM_DIR" fetch origin "refs/tags/$latest_release:refs/tags/$latest_release" 2>/dev/null || true
     fi
-    git -C "$LLVM_DIR" checkout HEAD 2>/dev/null || true
+    git -C "$LLVM_DIR" checkout -q FETCH_HEAD 2>/dev/null || true
   fi
   
   # Try to find commits between versions

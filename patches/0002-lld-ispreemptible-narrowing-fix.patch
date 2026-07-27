@@ -1,0 +1,39 @@
+From: OronyxClang <OronyxCI@users.noreply.github.com>
+Date: Mon, 27 Jul 2026 00:00:00 +0000
+Subject: [PATCH] lld: fix narrowing conversion from uint8_t to bool in
+ Relocations.cpp
+
+LLVM main branch changed `Symbol::isPreemptible` from `bool` to `uint8_t`
+(via BitfieldEntry), which triggers -Wc++11-narrowing errors when used in
+brace-initialized structs.
+
+Add explicit (bool) casts to silence the warning/error.
+
+Signed-off-by: OronyxClang <OronyxCI@users.noreply.github.com>
+---
+ lld/ELF/Relocations.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/lld/ELF/Relocations.cpp b/lld/ELF/Relocations.cpp
+index abcdef123456..789012345678 100644
+--- a/lld/ELF/Relocations.cpp
++++ b/lld/ELF/Relocations.cpp
+@@ -753,7 +753,7 @@ static void addPltEntry(Section &plt, GotPltSection &gotPlt, Section &relaPlt,
+   assert(sym.isFunc());
+   assert(expr == R_PLT_PC || expr == R_PLT);
+   plt.addEntry({sym.getPltIdx(ctx), sec, ctx, 0});
+-  relaPlt.addReloc({type, &plt, sym.getPltOffset(ctx), sym.isPreemptible, sym, 0, expr});
++  relaPlt.addReloc({type, &plt, sym.getPltOffset(ctx), (bool)sym.isPreemptible, sym, 0, expr});
+ }
+ 
+ template <typename Section, typename GotPltSection>
+@@ -757,7 +757,7 @@ template <typename Section, typename GotPltSection>
+ static void addPltEntry(Section &plt, GotPltSection &gotPlt,
+                         Section &relaPlt, const Symbol &sym,
+                         RelType type, RelExpr expr) {
+-  rel.addReloc({type, &gotPlt, sym.getGotPltOffset(ctx), sym.isPreemptible, sym,
++  rel.addReloc({type, &gotPlt, sym.getGotPltOffset(ctx), (bool)sym.isPreemptible, sym,
+                 type, 0, expr});
+ }
+-- 
+2.46.0

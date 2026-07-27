@@ -27,5 +27,5 @@ jobs:
           echo "=== Checking scripts ==="
           find scripts/ -name "*.sh" -exec shellcheck --severity=warning {} +
           echo "=== Checking root scripts ==="
-          shellcheck --severity=warning *.sh || true
+          shellcheck --severity=warning *.sh
           echo "=== Done ==="

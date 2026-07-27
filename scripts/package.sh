@@ -18,7 +18,7 @@ die() { echo -e "\033[1;31m[ERROR]\033[0m $*" >&2; exit 1; }
 [[ -d "$INSTALL_DIR" ]] || die "Toolchain not found at $INSTALL_DIR"
 mkdir -p "$OUTPUT_DIR"
 
-TARBALL="$OUTPUT_DIR/oronyx-clang-$TAG.tar.zst"
+# TARBALL set after TAG is finalized below
 
 # ─── Get build metadata ───────────────────────────────────────────────────────
 CLANG_BIN="$INSTALL_DIR/bin/clang"
@@ -40,6 +40,7 @@ LLVM_COMMIT_MSG="${LLVM_COMMIT_MSG:-Automated build}"
 # Tag format: {version}-{date} (e.g. 22.1.8-20260716)
 # RELEASE_TAG can override to keep backward compat
 TAG="${RELEASE_TAG:-$CLANG_VERSION-$BUILD_DATE_COMPACT}"
+TARBALL="$OUTPUT_DIR/oronyx-clang-$TAG.tar.zst"
 DOWNLOAD_URL="https://github.com/$REPO/releases/download/$TAG/oronyx-clang-$TAG.tar.zst"
 
 # ─── Fix ld symlink (common issue with cross-env) ─────────────────────────────
