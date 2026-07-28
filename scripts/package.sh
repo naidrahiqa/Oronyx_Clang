@@ -37,9 +37,9 @@ if [[ -n "$LLVM_COMMIT_FULL" && "$LLVM_COMMIT_FULL" != "unknown" && -d "$LLVM_DI
 fi
 LLVM_COMMIT_MSG="${LLVM_COMMIT_MSG:-Automated build}"
 
-# Tag format: {version}-{date} (e.g. 22.1.8-20260716)
+# Tag format: {version} (e.g. 22.1.8)
 # RELEASE_TAG can override to keep backward compat
-TAG="${RELEASE_TAG:-$CLANG_VERSION-$BUILD_DATE_COMPACT}"
+TAG="${RELEASE_TAG:-$CLANG_VERSION}"
 TARBALL="$OUTPUT_DIR/oronyx-clang-$TAG.tar.zst"
 DOWNLOAD_URL="https://github.com/$REPO/releases/download/$TAG/oronyx-clang-$TAG.tar.zst"
 
@@ -150,7 +150,9 @@ log "Packaging complete."
 if [[ -n "${GITHUB_ENV:-}" ]]; then
   echo "TARBALL_NAME=$(basename "$TARBALL")" >> "$GITHUB_ENV"
   echo "PACKAGE_SIZE=$TARBALL_SIZE" >> "$GITHUB_ENV"
+  echo "SHA256=$SHA256" >> "$GITHUB_ENV"
 fi
 echo "TARBALL=$TARBALL" >> "${GITHUB_OUTPUT:-/dev/null}"
 echo "RELEASE_TAG=$TAG" >> "${GITHUB_OUTPUT:-/dev/null}"
 echo "CLANG_VERSION=$CLANG_VERSION" >> "${GITHUB_OUTPUT:-/dev/null}"
+echo "SHA256=$SHA256" >> "${GITHUB_OUTPUT:-/dev/null}"

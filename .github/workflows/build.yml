@@ -84,17 +84,15 @@ jobs:
       - name: Set release tag from LLVM branch
         run: |
           BRANCH="${{ env.LLVM_BRANCH }}"
-          DATE_COMPACT=$(date -u +%Y%m%d)
           if [[ "$BRANCH" == "main" ]]; then
-            # Rolling build: use date as tag
-            VERSION="$DATE_COMPACT"
+            VERSION="rolling"
           else
-            # llvmorg-22.1.0 → 22.1.0, llvmorg-22.1.0-rc1 → 22.1.0-rc1
+            # llvmorg-22.1.8 → 22.1.8, llvmorg-22.1.8-rc1 → 22.1.8-rc1
             VERSION=$(echo "$BRANCH" | sed 's/^llvmorg-//')
           fi
           echo "RELEASE_TAG=${VERSION}" >> "$GITHUB_ENV"
           echo "ORONYX_VERSION=${VERSION}" >> "$GITHUB_ENV"
-          echo "Release tag: oronyx-${VERSION}"
+          echo "Release tag: ${VERSION}"
 
       - name: Count patches
         run: echo "PATCH_COUNT=$(ls -1 patches/*.patch 2>/dev/null | wc -l)" >> "$GITHUB_ENV"
@@ -261,7 +259,52 @@ jobs:
       - name: Show ccache stats
         run: ccache -s
 
+      # ── Verify ──────────────────────────────────────────────────────────────
+      - name: Run toolchain health check
+        run: bash scripts/toolchain-check.sh "$INSTALL_DIR"
+
+      # ── Collect build info (before cleanup) ──────────────────────────────────
+      - name: Collect build info
+        run: |
+          echo "BUILD_STAGE=Collecting build info" >> "$GITHUB_ENV"
+          # Save LLVM commit BEFORE we delete the source
+          LLVM_COMMIT_HASH=$(git -C "$LLVM_DIR" rev-parse HEAD 2>/dev/null || echo "unknown")
+          LLVM_COMMIT_FULL=$(git -C "$LLVM_DIR" rev-parse HEAD 2>/dev/null || echo "unknown")
+          echo "LLVM_COMMIT_HASH=${LLVM_COMMIT_HASH}" >> "$GITHUB_ENV"
+          echo "LLVM_COMMIT_FULL=${LLVM_COMMIT_FULL}" >> "$GITHUB_ENV"
+          echo "LLVM_COMMIT=${LLVM_COMMIT_HASH}" >> "$GITHUB_ENV"
+
+          CLANG_VERSION=$("$INSTALL_DIR/bin/clang" --version | head -1)
+          echo "CLANG_VERSION=${CLANG_VERSION}" >> "$GITHUB_ENV"
+          echo "Clang: ${CLANG_VERSION}"
+          echo "Commit: ${LLVM_COMMIT_HASH}"
+
+      - name: Generate LLVM changelog
+        run: |
+          PREV_LLVM=$(cat .llvm-version 2>/dev/null || echo "")
+          LLVM_TAG="${{ env.LLVM_BRANCH }}"
+          if [[ -n "$PREV_LLVM" && -d "$LLVM_DIR/.git" ]]; then
+            echo "Generating changelog: ${PREV_LLVM} → ${LLVM_TAG}"
+            bash scripts/llvm-changelog.sh "$LLVM_DIR" "$PREV_LLVM" "$LLVM_TAG" \
+              > /tmp/llvm_changelog.md 2>&1 || \
+              echo "Changelog generation failed, skipping" > /tmp/llvm_changelog.md
+          else
+            echo "No previous LLVM version to compare" > /tmp/llvm_changelog.md
+          fi
+
       # ── Package ──────────────────────────────────────────────────────────────
+      - name: Strip toolchain (slim)
+        run: |
+          SLIM_ARGS=""
+          if [[ "${SLIM_AGGRESSIVE:-false}" == "true" ]]; then
+            SLIM_ARGS="--aggressive"
+          fi
+          if [[ "${SLIM_TOOLCHAIN:-true}" == "true" ]]; then
+            bash scripts/toolchain-slim.sh "$INSTALL_DIR" $SLIM_ARGS
+          else
+            echo "Slim disabled by preset"
+          fi
+
       - name: Free up space after build
         run: |
           echo "=== Disk usage after build ==="
@@ -310,74 +353,100 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TARBALL="${{ steps.package.outputs.TARBALL }}"
-          
-          # Get LLVM commit info
-          LLVM_COMMIT_HASH=$(git -C "$LLVM_DIR" rev-parse HEAD 2>/dev/null || echo "unknown")
-          LLVM_COMMIT_MSG=$(git -C "$LLVM_DIR" log -1 --format="%s" 2>/dev/null || echo "Automated build")
-          CLANG_VERSION=$("$INSTALL_DIR/bin/clang" --version | head -1)
-          
-          RELEASE_BODY="CI: Build $RELEASE_TAG
+          TARBALL_NAME=$(basename "$TARBALL")
 
-          Clang version: $CLANG_VERSION
-          LLVM repo commit: $LLVM_COMMIT_MSG
-          Link: https://github.com/llvm/llvm-project/commit/$LLVM_COMMIT_HASH
+          BUILD_MODE="Plain"
+          if [[ "$ENABLE_PGO" == "true" && "$ENABLE_BOLT" == "true" ]]; then
+            BUILD_MODE="PGO + BOLT"
+          elif [[ "$ENABLE_PGO" == "true" ]]; then
+            BUILD_MODE="PGO"
+          elif [[ "$ENABLE_BOLT" == "true" ]]; then
+            BUILD_MODE="BOLT"
+          fi
+
+          # Read changelog if available
+          CHANGELOG_SECTION=""
+          if [[ -s /tmp/llvm_changelog.md ]]; then
+            CHANGELOG_SECTION=$(cat /tmp/llvm_changelog.md)
+          fi
+
+          # Build release body with placeholders, then substitute
+          cat > /tmp/release_body.md << 'BODYEOF'
+          ## Oronyx Clang @@RELEASE_TAG@@
+
+          | | |
+          |---|---|
+          | **Clang** | @@CLANG_VERSION@@ |
+          | **LLVM** | [llvm-project@@LLVM_COMMIT_HASH@@](https://github.com/llvm/llvm-project/commit/@@LLVM_COMMIT_HASH@@) |
+          | **Build Mode** | @@BUILD_MODE@@ · LTO=Thin |
+          | **Targets** | AArch64 · ARM |
+          | **Patches** | @@PATCH_COUNT@@ |
+          | **SHA256** | `@@SHA256@@` |
 
           ---
 
-          ## Installation
+          ### Quick Install
 
-          \`\`\`bash
-          bash <(wget -qO- https://raw.githubusercontent.com/naidrahiqa/Oronyx_Clang/main/get_clang.sh)
-          \`\`\`
+          ```bash
+          bash <(wget -qO- https://raw.githubusercontent.com/@@REPO@@/main/get_clang.sh)
+          ```
 
-          ## Manual Install
+          ### Manual Install
 
-          \`\`\`bash
-          URL=\$(wget -qO- https://raw.githubusercontent.com/naidrahiqa/Oronyx_Clang/main/latest.txt)
-          wget \"\$URL\"
-          tar -I zstd -xf oronyx-clang-*.tar.zst -C ~/toolchains/
-          export PATH=\"~/toolchains/oronyx/bin:\$PATH\"
-          \`\`\`
+          ```bash
+          wget "https://github.com/@@REPO@@/releases/download/@@RELEASE_TAG@@/@@TARBALL_NAME@@"
+          tar -I zstd -xf @@TARBALL_NAME@@ -C ~/toolchains/
+          export PATH="$HOME/toolchains/oronyx/bin:$PATH"
+          ```
 
-          ## Building Linux
+          ### Kernel Build
 
-          \`\`\`bash
-          export PATH=\"\$HOME/toolchains/oronyx/bin:\$\PATH\"
+          ```bash
+          export PATH="$HOME/toolchains/oronyx/bin:$PATH"
 
-          make -j\$(nproc) \\
-            O=out \\
-            ARCH=arm64 \\
-            CC=clang \\
-            CROSS_COMPILE=aarch64-linux-gnu- \\
-            LD=ld.lld \\
-            AR=llvm-ar \\
-            NM=llvm-nm \\
-            STRIP=llvm-strip \\
-            OBJCOPY=llvm-objcopy \\
+          make -j$(nproc) \
+            O=out \
+            ARCH=arm64 \
+            CC=clang \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            LD=ld.lld \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            STRIP=llvm-strip \
+            OBJCOPY=llvm-objcopy \
             OBJDUMP=llvm-objdump
-          \`\`\`
+          ```
 
-          ## Features
-
-          - PGO (Profile-Guided Optimization)
-          - ThinLTO / FullLTO
-          - BOLT post-build optimization
-          - Polly loop optimizer
-          - Kernel 4.14+ support
-          - AArch64 / ARM targets
+          @@CHANGELOG_SECTION@@
 
           ---
 
-          Signed-off-by: OronyxCI <OronyxCI@users.noreply.github.com>"
+          **Features:** PGO · ThinLTO · BOLT · Polly · Device Presets · KernelSU · Kernel 4.14+ · AArch64/ARM
 
-          # Delete existing release if it exists (rebuild scenario)
+          Signed-off-by: OronyxCI <OronyxCI@users.noreply.github.com>
+          BODYEOF
+
+          sed -i "s/@@RELEASE_TAG@@/${RELEASE_TAG}/g" /tmp/release_body.md
+          sed -i "s/@@CLANG_VERSION@@/${CLANG_VERSION}/g" /tmp/release_body.md
+          sed -i "s/@@LLVM_COMMIT_HASH@@/${LLVM_COMMIT_HASH}/g" /tmp/release_body.md
+          sed -i "s/@@BUILD_MODE@@/${BUILD_MODE}/g" /tmp/release_body.md
+          sed -i "s/@@PATCH_COUNT@@/${PATCH_COUNT}/g" /tmp/release_body.md
+          sed -i "s/@@REPO@@/${GITHUB_REPOSITORY}/g" /tmp/release_body.md
+          sed -i "s/@@TARBALL_NAME@@/${TARBALL_NAME}/g" /tmp/release_body.md
+          sed -i "s/@@SHA256@@/${SHA256}/g" /tmp/release_body.md
+          # Replace changelog placeholder with actual content (escaping sed special chars)
+          sed -i '/@@CHANGELOG_SECTION@@/{r /dev/stdin
+            d}' /tmp/release_body.md <<< "$CHANGELOG_SECTION"
+          # Remove leading whitespace from heredoc
+          sed -i 's/^          //' /tmp/release_body.md
+
           gh release delete "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true
           git push --delete origin "$RELEASE_TAG" 2>/dev/null || true
 
           gh release create "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --title "Oronyx Clang $RELEASE_TAG" \
-            --notes "$RELEASE_BODY" \
+            --notes-file /tmp/release_body.md \
             --latest \
             "$TARBALL" \
             "${{ env.OUTPUT_DIR }}/clang-version.txt" \
@@ -411,6 +480,14 @@ jobs:
           RELEASE_TAG: ${{ env.RELEASE_TAG }}
           TARBALL_NAME: ${{ steps.package.outputs.TARBALL_NAME }}
           PACKAGE_SIZE: ${{ env.PACKAGE_SIZE }}
+          SHA256: ${{ env.SHA256 }}
+
+      - name: Notify changelog
+        if: ${{ (github.event.inputs.release == 'true' || github.event_name == 'repository_dispatch') && success() }}
+        run: bash scripts/notify.sh changelog
+        env:
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+          CHANGELOG_FILE: /tmp/llvm_changelog.md
 
       - name: Notify build failure
         if: failure()

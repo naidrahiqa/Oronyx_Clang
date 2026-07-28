@@ -58,6 +58,7 @@ TARBALL_NAME="${TARBALL_NAME:-}"
 TARGETS="${LLVM_TARGETS:-AArch64;ARM;X86}"
 ERROR_DUMP_CHAT_ID="${ERROR_DUMP_CHAT_ID:-}"
 ERROR_DUMP_FILE="${ERROR_DUMP_FILE:-}"
+SHA256="${SHA256:-}"
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 DIVIDER="━━━━━━━━━━━━━━━━━━━━"
@@ -89,15 +90,12 @@ build_mode() {
 # ─── Message handlers ─────────────────────────────────────────────────────────
 case "$MESSAGE_TYPE" in
   started)
-    MSG="🔨 <b>OronyxClang #$RUN_NUMBER</b>
+    MSG="<b>🔨 OronyxClang #$RUN_NUMBER</b>
 $DIVIDER
-<b>LLVM</b> <code>$(llvm_version)</code>
-<b>Commit</b> <code>${ORONYX_COMMIT:0:7}</code>
-<b>Mode</b> <code>$(build_mode)</code>
-<b>Targets</b> <code>$TARGETS</code>
-<b>Date</b> $BUILD_DATE · <b>Patches</b> $PATCH_COUNT
+<b>LLVM</b> <code>$(llvm_version)</code> · <b>Patches</b> <code>$PATCH_COUNT</code>
+<b>Mode</b> <code>$(build_mode)</code> · <b>Targets</b> <code>$TARGETS</code>
 $DIVIDER
-⏱ Started $(date -u +%H:%M:%S) UTC
+⏱ Started <code>$(date -u +%H:%M:%S) UTC</code>
 <a href=\"$RUN_URL\">View Run</a>"
     send_msg "$MSG"
     ;;
@@ -105,13 +103,12 @@ $DIVIDER
   success)
     RELEASE_URL="https://github.com/$REPO/releases/tag/$RELEASE_TAG"
 
-    MSG="✅ <b>OronyxClang #$RUN_NUMBER</b>
+    MSG="<b>✅ OronyxClang #$RUN_NUMBER</b>
 $DIVIDER
 <b>Clang</b> <code>$CLANG_VERSION</code>
-<b>Duration</b> <code>$BUILD_DURATION</code>
-<b>Targets</b> <code>$TARGETS</code>
+<b>Duration</b> <code>$BUILD_DURATION</code> · <b>Targets</b> <code>$TARGETS</code>
 $DIVIDER
-📦 <code>$TARBALL_NAME</code> ($PACKAGE_SIZE)
+📦 <code>$TARBALL_NAME</code> <code>($PACKAGE_SIZE)</code>
 <a href=\"$RELEASE_URL\">Download Release</a>"
     send_msg "$MSG"
     ;;
@@ -125,10 +122,9 @@ $DIVIDER
     fi
     ERROR_FIRST_LINE=$(escape_html "$ERROR_FIRST_LINE" | grep -oP '^.{0,120}')
 
-    MSG="❌ <b>OronyxClang #$RUN_NUMBER</b>
+    MSG="<b>❌ OronyxClang #$RUN_NUMBER</b>
 $DIVIDER
-<b>LLVM</b> <code>$(llvm_version)</code>
-<b>Stage</b> <code>${BUILD_STAGE:-unknown}</code>
+<b>LLVM</b> <code>$(llvm_version)</code> · <b>Stage</b> <code>${BUILD_STAGE:-unknown}</code>
 <b>Duration</b> <code>${BUILD_DURATION:-unknown}</code>"
 
     if [[ -n "$ERROR_FIRST_LINE" ]]; then
@@ -152,7 +148,6 @@ $DIVIDER
       ERROR_FIRST_LINE=$(echo "$ERROR_LOG" | grep -i "error\|fatal\|failed" | head -1)
     fi
     if [[ -z "$FULL_LOG" && -n "$ERROR_DUMP_FILE" && -f "$ERROR_DUMP_FILE" && -s "$ERROR_DUMP_FILE" ]]; then
-      # Last 40 lines to fit Telegram's 4096 char limit
       FULL_LOG=$(tail -40 "$ERROR_DUMP_FILE" 2>/dev/null || true)
       ERROR_FIRST_LINE=$(grep -i "error\|fatal\|failed" "$ERROR_DUMP_FILE" 2>/dev/null | head -1)
     fi
@@ -160,11 +155,9 @@ $DIVIDER
     FULL_LOG=$(escape_html "$FULL_LOG")
     ERROR_FIRST_LINE=$(escape_html "$ERROR_FIRST_LINE" | grep -oP '^.{0,150}')
 
-    MSG="🐛 <b>Build #$RUN_NUMBER — Error Log</b>
+    MSG="<b>🐛 Build #$RUN_NUMBER — Error Dump</b>
 $DIVIDER
-<b>LLVM</b> <code>$(llvm_version)</code>
-<b>Stage</b> <code>${BUILD_STAGE:-unknown}</code>
-<b>Duration</b> <code>${BUILD_DURATION:-unknown}</code>"
+<b>LLVM</b> <code>$(llvm_version)</code> · <b>Stage</b> <code>${BUILD_STAGE:-unknown}</code>"
 
     if [[ -n "$ERROR_FIRST_LINE" ]]; then
       MSG="$MSG
@@ -187,12 +180,11 @@ $DIVIDER
   changelog)
     if [[ -n "$CHANGELOG_FILE" && -f "$CHANGELOG_FILE" ]]; then
       CONTENT=$(cat "$CHANGELOG_FILE")
-      # Simple markdown → HTML
       HTML_CONTENT=$(echo "$CONTENT" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')
       HTML_CONTENT=$(echo "$HTML_CONTENT" | sed -E 's/\*([^*]+)\*/<b>\1<\/b>/g')
       HTML_CONTENT=$(echo "$HTML_CONTENT" | sed -E 's/`([^`]+)`/<code>\1<\/code>/g')
 
-      MSG="📋 <b>OronyxClang #$RUN_NUMBER — Changelog</b>
+      MSG="<b>📋 OronyxClang #$RUN_NUMBER — Changelog</b>
 $DIVIDER
 $HTML_CONTENT
 $DIVIDER
@@ -205,21 +197,18 @@ $DIVIDER
     RELEASE_URL="https://github.com/$REPO/releases/tag/$RELEASE_TAG"
     ORONYX_VER="${RELEASE_TAG#oronyx-}"
     LLVM_COMMIT_HASH="${LLVM_COMMIT:-unknown}"
-    LLVM_COMMIT_MSG="${LLVM_COMMIT_MSG:-Automated build}"
 
-    MSG="🚀 <b>OronyxClang $ORONYX_VER</b>
+    MSG="<b>🚀 OronyxClang $ORONYX_VER</b>
 $DIVIDER
-<b>Clang</b> <code>$CLANG_VERSION</code>
+<b>Clang</b> <code>$CLANG_VERSION</code> · <b>Size</b> <code>$PACKAGE_SIZE</code>
 <b>Commit</b> <a href=\"https://github.com/llvm/llvm-project/commit/$LLVM_COMMIT_HASH\"><code>${LLVM_COMMIT_HASH:0:7}</code></a>
-<b>Size</b> <code>$PACKAGE_SIZE</code>
 $DIVIDER
-<b>Install</b>
 <pre><code>bash &lt;(wget -qO- https://raw.githubusercontent.com/naidrahiqa/Oronyx_Clang/main/get_clang.sh)</code></pre>
 $DIVIDER
-<b>Features</b>
-• PGO · ThinLTO · BOLT
-• Polly loop optimizer
-• Kernel 4.14+ · AArch64/ARM
+<b>SHA256</b> <code>${SHA256:0:16}...</code>
+<code>$SHA256</code>
+$DIVIDER
+PGO · ThinLTO · BOLT · Polly · Device Presets · KernelSU · Kernel 4.14+ · AArch64/ARM
 $DIVIDER
 📦 <code>$TARBALL_NAME</code>
 <a href=\"$RELEASE_URL\">GitHub Release</a>"

@@ -19,6 +19,9 @@ LTO_MODE="${LTO_MODE:-auto}"
 DRY_RUN="${DRY_RUN:-false}"
 VERBOSE="${VERBOSE:-false}"
 KCFLAGS_EXTRA="${KCFLAGS:-}"
+DEVICE="${DEVICE:-}"
+DEVICE_DIR="${ORONYX_ROOT}/config/devices"
+AK3_DIR=""
 
 # ─── Warning suppress flags per kernel era ────────────────────────────────────
 # 4.x kernels trigger many warnings with modern Clang (22+)
@@ -74,12 +77,15 @@ Usage: kernel-build.sh <kernel-dir> [options]
 Options:
   --arch=<arch>          Target architecture (default: arm64)
   --defconfig=<name>     Use specific defconfig (default: auto-detect)
+  --device=<codename>    Load device preset from config/devices/*.conf
+                         e.g. sm8150, sdm845, exynos990, mt6895
   --cross=<prefix>       Cross-compile prefix (default: aarch64-linux-gnu-)
   --triple=<triple>      Target triple (default: aarch64-linux-gnu-)
   --jobs=<n>             Parallel jobs (default: nproc)
   --out=<dir>            Output directory (default: <kernel-dir>/out)
   --lto=<mode>           LTO mode: thin, full, off, auto (default: auto)
                          auto = thin for kernel >= 5.12, off for < 5.0
+  --ak3=<dir>            Copy Image + dtb to AnyKernel3 dir after build
   --dry-run              Show commands without executing
   --verbose              Show full make output
   --no-warn-suppress     Don't add -Wno-* flags for legacy kernels
@@ -94,6 +100,15 @@ Examples:
 
   # Kernel 5.15 — auto ThinLTO
   kernel-build.sh ~/kernel/msm-5.15 --defconfig=vendor/sdm845_defconfig
+
+  # OnePlus 7 Pro (Snapdragon 855) — device preset
+  kernel-build.sh ~/kernel/sm8150 --device=sm8150
+
+  # OnePlus 6 (Snapdragon 845) — legacy kernel
+  kernel-build.sh ~/kernel/sdm845 --device=sdm845 --ak3=~/AnyKernel3
+
+  # Galaxy S20 (Exynos 990)
+  kernel-build.sh ~/kernel/exynos990 --device=exynos990
 
   # Kernel 6.1 — GKI with ThinLTO
   kernel-build.sh ~/kernel/android-mainline --lto=thin --arch=arm64
@@ -114,11 +129,13 @@ parse_args() {
     case "$1" in
       --arch=*)           ARCH="${1#*=}" ;;
       --defconfig=*)      DEFCONFIG="${1#*=}" ;;
+      --device=*)         DEVICE="${1#*=}" ;;
       --cross=*)          CROSS_COMPILE="${1#*=}" ;;
       --triple=*)         CLANG_TRIPLE="${1#*=}" ;;
       --jobs=*)           JOBS="${1#*=}" ;;
       --out=*)            OUT_DIR="${1#*=}" ;;
       --lto=*)            LTO_MODE="${1#*=}" ;;
+      --ak3=*)            AK3_DIR="${1#*=}" ;;
       --dry-run)          DRY_RUN=true ;;
       --verbose)          VERBOSE=true ;;
       --no-warn-suppress) NO_WARN_SUPPRESS=true ;;
@@ -474,9 +491,188 @@ print_summary() {
   info "LTO:      $LTO_MODE"
   info "Output:   $OUT_DIR"
   info "Duration: ${h}h ${m}m ${s}s"
+  if [[ -n "$DEVICE" ]]; then
+    info "Device:   $DEVICE"
+  fi
+  if [[ -d "$AK3_DIR" ]]; then
+    info "AK3:      $AK3_DIR"
+  fi
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
   df -h / 2>/dev/null | tail -1 || true
+}
+
+# ─── Load device preset ────────────────────────────────────────────────────
+load_device_config() {
+  [[ -z "$DEVICE" ]] && return
+
+  local device_files=(
+    "$DEVICE_DIR/${DEVICE}.conf"
+    "$DEVICE_DIR/snapdragon.conf"
+    "$DEVICE_DIR/exynos.conf"
+    "$DEVICE_DIR/mediatek.conf"
+  )
+
+  local found=""
+  for f in "${device_files[@]}"; do
+    if [[ -f "$f" ]] && grep -q "^\[$DEVICE\]" "$f" 2>/dev/null; then
+      found="$f"
+      break
+    fi
+  done
+
+  if [[ -z "$found" ]]; then
+    die "Device preset '$DEVICE' not found in config/devices/*.conf"
+  fi
+
+  log "Loading device preset: $DEVICE (from $(basename "$found"))"
+
+  # Extract config from INI-style section using sed
+  local section
+  section=$(sed -n "/^\[$DEVICE\]/,/^\[/p" "$found" | sed '1d;$d')
+
+  # Helper to extract key=value from section
+  local val
+  get_val() { echo "$section" | grep -E "^$1=" | head -1 | cut -d= -f2- | tr -d '[:space:]'; }
+
+  val=$(get_val "DEFCONFIG")
+  [[ -n "$val" ]] && DEFCONFIG="$val"
+
+  val=$(get_val "ARCH")
+  [[ -n "$val" ]] && ARCH="$val"
+
+  val=$(get_val "LTO_MODE")
+  [[ -n "$val" ]] && LTO_MODE="$val"
+
+  val=$(get_val "TARGETS")
+  [[ -n "$val" ]] && LLVM_TARGETS="$val"
+
+  val=$(get_val "KCFLAGS")
+  [[ -n "$val" ]] && KCFLAGS_EXTRA="${KCFLAGS_EXTRA:+$KCFLAGS_EXTRA }$val"
+
+  log "Device config applied: defconfig=$DEFCONFIG, lto=$LTO_MODE, arch=$ARCH"
+}
+
+# ─── Detect KernelSU ──────────────────────────────────────────────────────
+detect_kernelsu() {
+  local ksu_dir="$KERNEL_DIR/kernel/KernelSU"
+
+  if [[ -d "$ksu_dir" ]]; then
+    info "KernelSU detected at $ksu_dir"
+
+    if [[ -f "$ksu_dir/kernel/sucompat.h" ]]; then
+      info "  KernelSU version: $(grep -oP 'KERNELSU_VERSION\s+\K\d+' "$ksu_dir/include/linux/kernelsu.h" 2>/dev/null | head -1 || echo "unknown")"
+    fi
+    return 0
+  fi
+
+  # Also check for KernelSU in common locations
+  if [[ -f "$KERNEL_DIR/kernel/KernelSU/kernel/Makefile" ]] || \
+     [[ -f "$KERNEL_DIR/KernelSU/kernel/Makefile" ]]; then
+    info "KernelSU detected (alternate location)"
+    return 0
+  fi
+
+  return 1
+}
+
+# ─── Apply KernelSU config fragment ───────────────────────────────────────
+apply_kernelsu_config() {
+  if ! detect_kernelsu; then
+    return
+  fi
+
+  local ksu_config="$OUT_DIR/.config.kernelsu"
+  cat > "$ksu_config" << 'EOF'
+CONFIG_KPROBES=y
+CONFIG_HAVE_KPROBES=y
+CONFIG_KPROBE_EVENTS=y
+CONFIG_MODULES=y
+CONFIG_MODULE_UNLOAD=y
+EOF
+
+  log "Applying KernelSU config fragment ..."
+  local cmd=(
+    make -C "$KERNEL_DIR"
+    O="$OUT_DIR"
+    ARCH="$ARCH"
+    CC=clang
+    CLANG_TRIPLE="$CLANG_TRIPLE"
+    CROSS_COMPILE="$CROSS_COMPILE"
+    HOSTCC=clang
+    HOSTCXX=clang++
+    KERNELSU_CONFIG="$ksu_config"
+  )
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    info "[DRY RUN] ${cmd[*]} scripts/kconfig/merge_config.sh ..."
+    return
+  fi
+
+  if [[ -f "$KERNEL_DIR/scripts/kconfig/merge_config.sh" ]]; then
+    log "Merging KernelSU config into .config ..."
+    bash "$KERNEL_DIR/scripts/kconfig/merge_config.sh" \
+      -m -O "$OUT_DIR" \
+      "$OUT_DIR/.config" \
+      "$ksu_config" 2>&1 | grep -E "merged|error|warning" || true
+    log "KernelSU config merged."
+  else
+    warn "merge_config.sh not found — KernelSU config not applied."
+    warn "Manually add these to your defconfig:"
+    cat "$ksu_config"
+  fi
+}
+
+# ─── AnyKernel3 packaging ────────────────────────────────────────────────
+anykernel3_package() {
+  [[ -z "$AK3_DIR" ]] && return
+  [[ -d "$AK3_DIR" ]] || { warn "AnyKernel3 dir not found: $AK3_DIR"; return; }
+
+  log "Packaging kernel image for AnyKernel3 ..."
+
+  local image_src=""
+  for path in \
+    "$OUT_DIR/arch/$ARCH/boot/Image.gz-dtb" \
+    "$OUT_DIR/arch/$ARCH/boot/Image.gz" \
+    "$OUT_DIR/arch/$ARCH/boot/Image"; do
+    if [[ -f "$path" ]]; then
+      image_src="$path"
+      break
+    fi
+  done
+
+  if [[ -z "$image_src" ]]; then
+    warn "No kernel image found for AK3 packaging."
+    return
+  fi
+
+  local image_dst="$AK3_DIR/Image"
+  if [[ "$image_src" == *".gz-dtb" ]]; then
+    image_dst="$AK3_DIR/Image.gz-dtb"
+  elif [[ "$image_src" == *".gz" ]]; then
+    image_dst="$AK3_DIR/Image.gz"
+  fi
+
+  cp -f "$image_src" "$image_dst"
+  local size
+  size=$(du -sh "$image_dst" | cut -f1)
+  info "  Image copied: $image_dst ($size)"
+
+  # Copy DTB if present
+  local dtb_src="$OUT_DIR/arch/$ARCH/boot/dtb.img"
+  if [[ -f "$dtb_src" ]]; then
+    cp -f "$dtb_src" "$AK3_DIR/dtb"
+    info "  DTB copied to $AK3_DIR/dtb"
+  fi
+
+  # Copy DTBO if present
+  local dtbo_src="$OUT_DIR/arch/$ARCH/boot/dtbo.img"
+  if [[ -f "$dtbo_src" ]]; then
+    cp -f "$dtbo_src" "$AK3_DIR/dtbo"
+    info "  DTBO copied to $AK3_DIR/dtbo"
+  fi
+
+  info "AnyKernel3 packaging done! Flashable zip ready at: $AK3_DIR"
 }
 
 # ─── Main ────────────────────────────────────────────────────────────────────
@@ -485,6 +681,7 @@ main() {
   echo ""
 
   parse_args "$@"
+  load_device_config
   detect_kernel
   detect_clang
   resolve_lto
@@ -501,12 +698,15 @@ main() {
   info "  Triple:      $CLANG_TRIPLE"
   info "  LTO:         $LTO_MODE"
   info "  Warn flags:  ${#WARN_FLAGS[@]}"
+  [[ -n "$DEVICE" ]] && info "  Device:      $DEVICE"
   echo ""
 
   clean_build
   configure_kernel
+  apply_kernelsu_config
   build_kernel
   generate_image
+  anykernel3_package
   print_summary
 }
 

@@ -14,6 +14,20 @@ ENABLE_BOLT="${ENABLE_BOLT:-true}"
 PGO_WORKLOAD="${PGO_WORKLOAD:-sqlite}"
 LTO_MODE="${LTO_MODE:-Thin}"
 ZSTD_LEVEL="${ZSTD_LEVEL:-19}"
+PRESET="${PRESET:-}"
+
+# Load build preset if specified
+PRESET_DIR="$(cd "$(dirname "$0")/.." && pwd)/config/presets"
+if [[ -n "$PRESET" ]]; then
+  preset_file="$PRESET_DIR/${PRESET}.conf"
+  if [[ -f "$preset_file" ]]; then
+    echo -e "\033[1;35m[Preset]\033[0m Loading preset: $PRESET ($preset_file)"
+    source "$preset_file"
+  else
+    echo -e "\033[1;31m[ERROR]\033[0m Preset '$PRESET' not found at $preset_file"
+    exit 1
+  fi
+fi
 
 # Memory-aware job scaling
 if [[ -z "${JOBS:-}" ]]; then
@@ -494,6 +508,69 @@ collect_kernel() {
   log "Kernel workload completed successfully."
 }
 
+# ─── PGO Profile Collection: LLVM Self-Build ──────────────────────────────
+collect_llvm() {
+  log "Collecting PGO profiles via LLVM self-build ..."
+  local profile_dir="$BUILD_DIR/profiles"
+  mkdir -p "$profile_dir"
+
+  export LLVM_PROFILE_FILE="$profile_dir/oronyx-%p.profraw"
+
+  local llvm_build="$BUILD_DIR/llvm-workload"
+  mkdir -p "$llvm_build"
+
+  # Build a subset of LLVM using stage1 clang — this generates the most
+  # representative profile for a C/C++ compiler workload.
+  log "Building LLVM tablegen + clang frontend with instrumented stage1 ..."
+
+  cmake -S "$LLVM_DIR/llvm" -B "$llvm_build" -G Ninja \
+    -DCMAKE_C_COMPILER="$STAGE1_CC" \
+    -DCMAKE_CXX_COMPILER="$STAGE1_CXX" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DLLVM_TARGETS_TO_BUILD="AArch64;ARM" \
+    -DLLVM_ENABLE_PROJECTS="clang" \
+    -DLLVM_INCLUDE_TESTS=OFF \
+    -DLLVM_INCLUDE_EXAMPLES=OFF \
+    -DLLVM_INCLUDE_BENCHMARKS=OFF \
+    -DLLVM_ENABLE_BINDINGS=OFF \
+    -DLLVM_BUILD_DOCS=OFF \
+    -DLLVM_ENABLE_WARNINGS=OFF \
+    -DLLVM_TABLEGEN="$STAGE1_INSTALL/bin/llvm-tblgen" \
+    -DCLANG_TABLEGEN="$STAGE1_INSTALL/bin/clang-tblgen" \
+    2>&1 | tail -5 >> "$BUILD_DIR/build.log" || true
+
+  # Build only the most-used targets: clang frontend, codegen, basic utils
+  # This hits the hot compiler paths without building everything
+  local targets=(
+    "clang/lib/Sema"
+    "clang/lib/CodeGen"
+    "clang/lib/Parse"
+    "clang/lib/AST"
+    "clang/lib/Basic"
+    "llvm/lib/IR"
+    "llvm/lib/CodeGen"
+    "llvm/lib/Transforms"
+    "llvm/lib/Target/AArch64"
+  )
+
+  for target in "${targets[@]}"; do
+    log "  ninja $target ..."
+    ninja -C "$llvm_build" "$target" 2>&1 | tail -3 >> "$BUILD_DIR/build.log" || true
+  done
+
+  log "Cleaning up LLVM workload build ..."
+  rm -rf "$llvm_build"
+
+  shopt -s nullglob
+  local profiles=("$profile_dir"/*.profraw)
+  shopt -u nullglob
+  if (( ${#profiles[@]} == 0 )); then
+    warn "LLVM workload generated no profiles."
+    return 1
+  fi
+  log "LLVM self-build workload completed: ${#profiles[@]} profiles."
+}
+
 # ─── PGO Profile Collection ───────────────────────────────────────────────────
 collect_profiles() {
   local workload="${PGO_WORKLOAD:-sqlite}"
@@ -504,6 +581,8 @@ collect_profiles() {
 
   if [[ "$workload" == "kernel" ]]; then
     collect_kernel || { warn "Kernel workload failed, falling back to SQLite workload..."; collect_sqlite; } || return 1
+  elif [[ "$workload" == "llvm" ]]; then
+    collect_llvm || { warn "LLVM workload failed, falling back to SQLite workload..."; collect_sqlite; } || return 1
   else
     collect_sqlite || return 1
   fi
@@ -609,9 +688,10 @@ cleanup_stage1_artifacts() {
   log "Disk cleanup complete"
 }
 
-# ─── Stage 2: Optimized Final Build ───────────────────────────────────────────
+# ─── Stage 2: Optimized Build (intermediate) ─────────────────────────────────
 stage2_build() {
-  log "Stage 2: Building optimized OronyxClang (LTO=$LTO_MODE) ..."
+  local stage2_install="${1:-$BUILD_DIR/stage2-install}"
+  log "Stage 2: Building optimized Clang (LTO=$LTO_MODE) → $stage2_install ..."
   local s2_build="$BUILD_DIR/stage2"
 
   # Prepend Stage 1 bin to PATH so that CMake and Clang find lld, llvm-profdata, etc.
@@ -627,9 +707,19 @@ stage2_build() {
   # Enable runtimes (libcxx, libcxxabi) for stage2 — the only stage that needs them.
   local saved_runtimes="$LLVM_RUNTIMES"
   LLVM_RUNTIMES="libcxx;libcxxabi"
-  cmake_configure "$LLVM_DIR" "$s2_build" "$INSTALL_DIR" "$LLVM_PROJECTS" "" \
+
+  # Detect host CPU for native tuning flags
+  local arch_flags=""
+  if command -v clang &>/dev/null; then
+    # Let Clang detect the host CPU and generate appropriate flags
+    arch_flags="-march=native -mtune=native"
+  fi
+
+  cmake_configure "$LLVM_DIR" "$s2_build" "$stage2_install" "$LLVM_PROJECTS" "" \
     -DCMAKE_C_COMPILER="$STAGE1_CC" \
     -DCMAKE_CXX_COMPILER="$STAGE1_CXX" \
+    -DCMAKE_C_FLAGS="$arch_flags" \
+    -DCMAKE_CXX_FLAGS="$arch_flags" \
     -DLLVM_ENABLE_LTO="$LTO_MODE" \
     -DCOMPILER_RT_ENABLE_LTO=OFF \
     -DLLVM_PROFDATA_FILE="$PGO_PROF" \
@@ -638,7 +728,8 @@ stage2_build() {
     -DCOMPILER_RT_BUILD_XRAY=OFF \
     -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
     -DCOMPILER_RT_BUILD_PROFILE=OFF \
-    -DCOMPILER_RT_BUILD_CRT=OFF
+    -DCOMPILER_RT_BUILD_CRT=OFF \
+    -DPOLLY_ENABLE_LOOP_EXTRACT=ON
   LLVM_RUNTIMES="$saved_runtimes"
 
   # Ensure just-built shared libraries (libc++, libc++abi) are findable by child
@@ -670,88 +761,252 @@ stage2_build() {
   export PATH="$old_path"
 }
 
+# ─── Stage 3: Final Optimized Build (3-stage PGO) ────────────────────────────
+stage3_build() {
+  log "Stage 3: Final optimized build using Stage 2 Clang + refined PGO ..."
+  local s3_build="$BUILD_DIR/stage3"
+
+  local old_path="$PATH"
+  export PATH="$STAGE2_INSTALL/bin:$PATH"
+
+  local arch_flags="-march=native -mtune=native"
+
+  local saved_runtimes="$LLVM_RUNTIMES"
+  LLVM_RUNTIMES="libcxx;libcxxabi"
+
+  cmake_configure "$LLVM_DIR" "$s3_build" "$INSTALL_DIR" "$LLVM_PROJECTS" "" \
+    -DCMAKE_C_COMPILER="$STAGE2_INSTALL/bin/clang" \
+    -DCMAKE_CXX_COMPILER="$STAGE2_INSTALL/bin/clang++" \
+    -DCMAKE_C_FLAGS="$arch_flags" \
+    -DCMAKE_CXX_FLAGS="$arch_flags" \
+    -DLLVM_ENABLE_LTO="$LTO_MODE" \
+    -DCOMPILER_RT_ENABLE_LTO=OFF \
+    -DLLVM_PROFDATA_FILE="$PGO_PROF_2" \
+    -DLLVM_ENABLE_PLUGINS=ON \
+    -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
+    -DCOMPILER_RT_BUILD_XRAY=OFF \
+    -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
+    -DCOMPILER_RT_BUILD_PROFILE=OFF \
+    -DCOMPILER_RT_BUILD_CRT=OFF \
+    -DPOLLY_ENABLE_LOOP_EXTRACT=ON
+  LLVM_RUNTIMES="$saved_runtimes"
+
+  local old_ld_path="${LD_LIBRARY_PATH:-}"
+  export LD_LIBRARY_PATH="$s3_build/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  cmake --build "$s3_build" -j"$JOBS" 2>&1 | tee -a "$BUILD_DIR/build.log"
+  export LD_LIBRARY_PATH="$old_ld_path"
+
+  log "Stage 3 build done. Cleaning object files before install ..."
+  find "$s3_build" -name "*.o" -delete 2>/dev/null || true
+  find "$s3_build" -name "*.obj" -delete 2>/dev/null || true
+  rm -rf "$BUILD_DIR/lto-cache" 2>/dev/null || true
+  df -h / 2>/dev/null | tail -1 || true
+
+  cmake --install "$s3_build" 2>&1 | tee -a "$BUILD_DIR/build.log"
+  bundle_libcxx "$s3_build"
+
+  log "Removing Stage 3 build directory ..."
+  rm -rf "$s3_build" 2>/dev/null || true
+  df -h / 2>/dev/null | tail -1 || true
+
+  export PATH="$old_path"
+}
+
+# ─── 3-Stage PGO Profile Collection ──────────────────────────────────────────
+collect_profiles_stage2() {
+  local workload="${PGO_WORKLOAD:-sqlite}"
+  log "Stage 2 PGO: collecting refined profiles using Stage 2 Clang ..."
+
+  local profile_dir="$BUILD_DIR/profiles-stage2"
+  mkdir -p "$profile_dir"
+
+  export LLVM_PROFILE_FILE="$profile_dir/oronyx-%p.profraw"
+  export STAGE1_CC="$STAGE2_INSTALL/bin/clang"
+  export STAGE1_CXX="$STAGE2_INSTALL/bin/clang++"
+  export STAGE1_INSTALL="$STAGE2_INSTALL"
+
+  if [[ "$workload" == "kernel" ]]; then
+    collect_kernel || collect_sqlite || return 1
+  elif [[ "$workload" == "llvm" ]]; then
+    collect_llvm || collect_sqlite || return 1
+  else
+    collect_sqlite || return 1
+  fi
+
+  local profiles=("$profile_dir"/*.profraw)
+  if [[ ${#profiles[@]} -eq 0 ]]; then
+    warn "Stage 2 PGO: no profiles generated."
+    return 1
+  fi
+
+  log "Merging Stage 2 PGO profiles ..."
+  local profdata_bin="$STAGE2_INSTALL/bin/llvm-profdata"
+  if ! "$profdata_bin" merge -output="$BUILD_DIR/pgo-stage2.prof" "${profiles[@]}"; then
+    warn "llvm-profdata merge failed for stage2 profiles"
+    return 1
+  fi
+
+  export PGO_PROF_2="$BUILD_DIR/pgo-stage2.prof"
+  rm -rf "$profile_dir"
+  log "Stage 2 PGO profile ready: $PGO_PROF_2"
+}
+
 # ─── BOLT Post-Build Optimization ────────────────────────────────────────────
 apply_bolt() {
   [[ "$ENABLE_BOLT" == "true" ]] || return 0
 
-  local clang_bin="$INSTALL_DIR/bin/clang"
   local llvm_bolt="${INSTALL_DIR}/bin/llvm-bolt"
   local perf2bolt="${INSTALL_DIR}/bin/perf2bolt"
 
-  # Check prerequisites
-  [[ -x "$clang_bin" ]] || { warn "clang binary not found, skipping BOLT"; return 0; }
   [[ -x "$llvm_bolt" ]] || { warn "llvm-bolt not found, skipping BOLT"; return 0; }
   command -v perf &>/dev/null || { warn "perf not found, skipping BOLT"; return 0; }
 
-  log "Applying BOLT optimization to clang ..."
   local bolt_dir="$BUILD_DIR/bolt"
   mkdir -p "$bolt_dir"
+  local bolt_report="$bolt_dir/report.txt"
 
-  # Step 1: Collect perf profile
-  local perf_data="$bolt_dir/clang.perf.data"
-  local test_c="$bolt_dir/test.c"
-  echo 'int main(void) { return 0; }' > "$test_c"
+  log "Applying BOLT optimization ..."
+  echo "BOLT Optimization Report" > "$bolt_report"
+  echo "=======================" >> "$bolt_report"
+  echo "" >> "$bolt_report"
 
-  log "  BOLT: Collecting perf profile ..."
-  perf record -e cycles:u -j any,u -o "$perf_data" \
-    "$clang_bin" -c -O2 -o /dev/null "$test_c" 2>/dev/null || {
-    warn "BOLT: perf record failed, skipping"
-    return 0
-  }
-
-  [[ -s "$perf_data" ]] || { warn "BOLT: no perf data collected, skipping"; return 0; }
-
-  # Step 2: Convert perf data to BOLT format
-  local fdata="$bolt_dir/clang.fdata"
-  log "  BOLT: Converting perf data ..."
-
-  if [[ -x "$perf2bolt" ]]; then
-    "$perf2bolt" -p "$perf_data" -o "$fdata" "$clang_bin" 2>/dev/null || {
-      warn "BOLT: perf2bolt conversion failed, skipping"
-      return 0
-    }
-  else
-    warn "BOLT: perf2bolt not found, skipping"
-    return 0
+  # ─── Binaries to BOLT-optimize ────────────────────────────────────────────
+  local targets=()
+  if [[ -x "$INSTALL_DIR/bin/clang" ]]; then
+    targets+=("$INSTALL_DIR/bin/clang:Compile C source:compile")
+  fi
+  if [[ -x "$INSTALL_DIR/bin/ld.lld" ]]; then
+    targets+=("$INSTALL_DIR/bin/ld.lld:Link object files:link")
+  fi
+  if [[ -x "$INSTALL_DIR/bin/llvm-ar" ]]; then
+    targets+=("$INSTALL_DIR/bin/llvm-ar:Archive static lib:archive")
+  fi
+  if [[ -x "$INSTALL_DIR/bin/llvm-objcopy" ]]; then
+    targets+=("$INSTALL_DIR/bin/llvm-objcopy:Copy/convert binary:objcopy")
+  fi
+  if [[ -x "$INSTALL_DIR/bin/llvm-strip" ]]; then
+    targets+=("$INSTALL_DIR/bin/llvm-strip:Strip binary:strip")
   fi
 
-  # Step 3: Apply BOLT optimization
-  local bolted_bin="$bolt_dir/clang.bolt"
-  log "  BOLT: Optimizing clang binary ..."
+  for entry in "${targets[@]}"; do
+    IFS=':' read -r bin_path bin_desc workload_type <<< "$entry"
+    local bin_name; bin_name=$(basename "$bin_path")
+    echo "────────────────────────────────────────" >> "$bolt_report"
+    echo "Binary: $bin_name" >> "$bolt_report"
+    echo "────────────────────────────────────────" >> "$bolt_report"
 
-  "$llvm_bolt" "$clang_bin" \
-    -data="$fdata" \
-    -o "$bolted_bin" \
-    -reorder-blocks=ext-tsp \
-    -reorder-functions=hfsort+ \
-    -split-functions \
-    -split-all-cold \
-    -dyno-stats \
-    -icf=1 \
-    -use-gnu-stack \
-    2>&1 | tee -a "$BUILD_DIR/build.log" || {
-    warn "BOLT: optimization failed, skipping"
-    return 0
-  }
+    local perf_data="$bolt_dir/${bin_name}.perf.data"
+    local fdata="$bolt_dir/${bin_name}.fdata"
+    local bolted_out="$bolt_dir/${bin_name}.bolt"
+    local test_dir="$bolt_dir/workload-${bin_name}"
+    mkdir -p "$test_dir"
 
-  # Step 4: Replace original binary
-  if [[ -s "$bolted_bin" ]]; then
-    local original_size bolted_size saved_pct=0
-    original_size=$(stat -c%s "$clang_bin" 2>/dev/null || stat -f%z "$clang_bin" 2>/dev/null || echo 0)
-    bolted_size=$(stat -c%s "$bolted_bin" 2>/dev/null || stat -f%z "$bolted_bin" 2>/dev/null || echo 0)
+    log "  BOLT: $bin_name ($bin_desc) ..."
 
-    cp "$bolted_bin" "$clang_bin"
-    chmod +x "$clang_bin"
+    # Collect perf profile with binary-specific workload
+    local perf_ok=false
+    case "$workload_type" in
+      compile)
+        local test_c="$test_dir/test.c"
+        echo 'int main(void) { return 0; }' > "$test_c"
+        perf record -e cycles:u -j any,u -o "$perf_data" \
+          "$bin_path" -c -O2 -o /dev/null "$test_c" 2>/dev/null && perf_ok=true
+        ;;
+      link)
+        local test_a="$test_dir/a.o" test_b="$test_dir/b.o"
+        echo 'int foo(void) { return 42; }' > "$test_dir/a.c"
+        echo 'int foo(void); int main(void) { return foo(); }' > "$test_dir/b.c"
+        if "$INSTALL_DIR/bin/clang" -c -o "$test_a" "$test_dir/a.c" 2>/dev/null &&
+           "$INSTALL_DIR/bin/clang" -c -o "$test_b" "$test_dir/b.c" 2>/dev/null; then
+          perf record -e cycles:u -j any,u -o "$perf_data" \
+            "$bin_path" -o "$test_dir/test" "$test_a" "$test_b" 2>/dev/null && perf_ok=true
+        fi
+        ;;
+      archive)
+        local test_o="$test_dir/test.o"
+        echo 'int test_func(void) { return 0; }' > "$test_dir/test.c"
+        if "$INSTALL_DIR/bin/clang" -c -o "$test_o" "$test_dir/test.c" 2>/dev/null; then
+          perf record -e cycles:u -j any,u -o "$perf_data" \
+            "$bin_path" rcs "$test_dir/libtest.a" "$test_o" 2>/dev/null && perf_ok=true
+        fi
+        ;;
+      objcopy|strip)
+        local test_bin="$test_dir/test_copy"
+        if [[ -x "$INSTALL_DIR/bin/clang" ]]; then
+          cp "$INSTALL_DIR/bin/clang" "$test_dir/test_binary" 2>/dev/null || true
+        fi
+        if [[ -f "$test_dir/test_binary" ]]; then
+          local copy_cmd=("$bin_path")
+          [[ "$workload_type" == "strip" ]] && copy_cmd+=(--strip-all -g)
+          copy_cmd+=("$test_dir/test_binary" "$test_bin")
+          perf record -e cycles:u -j any,u -o "$perf_data" \
+            "${copy_cmd[@]}" 2>/dev/null && perf_ok=true
+        fi
+        ;;
+    esac
 
-    if [[ "$original_size" -gt 0 ]]; then
-      saved_pct=$(( (original_size - bolted_size) * 100 / original_size ))
+    if [[ "$perf_ok" != "true" ]]; then
+      warn "    Perf record failed for $bin_name, skipping"
+      rm -rf "$test_dir"
+      continue
     fi
 
-    log "  BOLT: Done! Size: ${original_size} → ${bolted_size} bytes (${saved_pct}% smaller)"
-  else
-    warn "BOLT: bolted binary is empty, skipping"
-    return 0
-  fi
+    [[ -s "$perf_data" ]] || { warn "    No perf data for $bin_name"; rm -rf "$test_dir"; continue; }
+
+    # Convert perf data to BOLT format
+    if [[ -x "$perf2bolt" ]]; then
+      "$perf2bolt" -p "$perf_data" -o "$fdata" "$bin_path" 2>/dev/null || {
+        warn "    perf2bolt failed for $bin_name"
+        rm -rf "$test_dir"
+        continue
+      }
+    else
+      warn "    perf2bolt not found, skipping"
+      rm -rf "$test_dir"
+      continue
+    fi
+
+    # Apply BOLT optimization
+    "$llvm_bolt" "$bin_path" \
+      -data="$fdata" \
+      -o "$bolted_out" \
+      -reorder-blocks=ext-tsp \
+      -reorder-functions=hfsort+ \
+      -split-functions \
+      -split-all-cold \
+      -dyno-stats \
+      -icf=1 \
+      -use-gnu-stack \
+      2>&1 | tee -a "$BUILD_DIR/build.log" || {
+      warn "    BOLT optimization failed for $bin_name"
+      rm -rf "$test_dir"
+      continue
+    }
+
+    # Replace original binary
+    if [[ -s "$bolted_out" ]]; then
+      local original_size bolted_size saved_pct=0
+      original_size=$(stat -c%s "$bin_path" 2>/dev/null || stat -f%z "$bin_path" 2>/dev/null || echo 0)
+      bolted_size=$(stat -c%s "$bolted_out" 2>/dev/null || stat -f%z "$bolted_out" 2>/dev/null || echo 0)
+
+      cp "$bolted_out" "$bin_path"
+      chmod +x "$bin_path"
+
+      if [[ "$original_size" -gt 0 ]]; then
+        saved_pct=$(( (original_size - bolted_size) * 100 / original_size ))
+      fi
+
+      local result="OK: ${original_size} → ${bolted_size} bytes (${saved_pct}% smaller)"
+      log "    $bin_name: $result"
+      echo "$result" >> "$bolt_report"
+    else
+      warn "    BOLT output empty for $bin_name"
+    fi
+
+    rm -rf "$test_dir"
+  done
+
+  log "BOLT report: $bolt_report"
 }
 
 # ─── Simple Build (no PGO) ────────────────────────────────────────────────────
@@ -779,7 +1034,9 @@ simple_build() {
 
   local cmake_args=()
   if [[ -n "$cc" ]]; then
+    local arch_flags="-march=native -mtune=native"
     cmake_args+=(-DCMAKE_C_COMPILER="$cc" -DCMAKE_CXX_COMPILER="$cxx" -DLLVM_ENABLE_LTO="$LTO_MODE")
+    cmake_args+=(-DCMAKE_C_FLAGS="$arch_flags" -DCMAKE_CXX_FLAGS="$arch_flags")
   else
     warn "No Clang host compiler found — building without LTO"
     cmake_args+=(-DLLVM_ENABLE_LTO=Off)
@@ -881,27 +1138,67 @@ main() {
 
     log "Available disk after Stage 1: $(df -h / | tail -1 | awk '{print $4}')"
 
-    BUILD_STAGE="PGO profile collection"
+    BUILD_STAGE="PGO profile collection (1)"
     export BUILD_STAGE
     stage_timer_start "pgo_collect"
     if collect_profiles; then
       stage_timer_end "pgo_collect"
       cleanup_stage1_artifacts
 
+      # ── Stage 2 (intermediate) ─────────────────────────────────────────────
       log "Available disk before Stage 2: $(df -h / | tail -1 | awk '{print $4}')"
       check_disk_space 8000000 "Stage 2"
-      BUILD_STAGE="Stage 2: Optimized build"
+      BUILD_STAGE="Stage 2: Optimized build (intermediate)"
       export BUILD_STAGE
       stage_timer_start "stage2"
-      stage2_build
+      export STAGE2_INSTALL="$BUILD_DIR/stage2-install"
+      stage2_build "$STAGE2_INSTALL"
       stage_timer_end "stage2"
 
-      BUILD_STAGE="BOLT optimization"
+      # ── Stage 2 PGO collection ─────────────────────────────────────────────
+      log "Available disk before Stage 2 PGO: $(df -h / | tail -1 | awk '{print $4}')"
+      BUILD_STAGE="PGO profile collection (2)"
       export BUILD_STAGE
-      stage_timer_start "bolt"
-      apply_bolt
-      stage_timer_end "bolt"
-      BUILD_SUCCESS=true
+      stage_timer_start "pgo_collect2"
+      if collect_profiles_stage2; then
+        stage_timer_end "pgo_collect2"
+
+        # Cleanup stage2 install (save disk for stage3)
+        log "Cleaning Stage 2 install dir ..."
+        rm -rf "$STAGE2_INSTALL" 2>/dev/null || true
+        df -h / 2>/dev/null | tail -1 || true
+
+        # ── Stage 3 (final) ──────────────────────────────────────────────────
+        log "Available disk before Stage 3: $(df -h / | tail -1 | awk '{print $4}')"
+        check_disk_space 8000000 "Stage 3"
+        BUILD_STAGE="Stage 3: Final optimized build"
+        export BUILD_STAGE
+        stage_timer_start "stage3"
+        stage3_build
+        stage_timer_end "stage3"
+
+        BUILD_STAGE="BOLT optimization"
+        export BUILD_STAGE
+        stage_timer_start "bolt"
+        apply_bolt
+        stage_timer_end "bolt"
+        BUILD_SUCCESS=true
+      else
+        stage_timer_end "pgo_collect2"
+        warn "Stage 2 PGO collection failed. Falling back to Stage 2 build."
+        # Move stage2 install to final location
+        if [[ -d "$STAGE2_INSTALL/bin" ]]; then
+          log "Using Stage 2 build as final ..."
+          mkdir -p "$INSTALL_DIR"
+          cp -r "$STAGE2_INSTALL"/* "$INSTALL_DIR/"
+          BUILD_STAGE="BOLT optimization"
+          export BUILD_STAGE
+          stage_timer_start "bolt"
+          apply_bolt
+          stage_timer_end "bolt"
+          BUILD_SUCCESS=true
+        fi
+      fi
     else
       stage_timer_end "pgo_collect"
       warn "PGO profile collection failed. Falling back to non-PGO build."
@@ -951,7 +1248,7 @@ main() {
       echo "  \"duration\": \"$BUILD_DURATION\","
       echo "  \"stages\": {"
       local first=true
-      for key in clone patches stage1 pgo_collect stage2 bolt simple; do
+      for key in clone patches stage1 pgo_collect stage2 pgo_collect2 stage3 bolt simple; do
         if [[ -n "${STAGE_TIMES[$key]:-}" ]]; then
           [[ "$first" == "true" ]] || echo ","
           printf '    "%s": %d' "$key" "${STAGE_TIMES[$key]}"

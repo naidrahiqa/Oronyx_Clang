@@ -117,6 +117,21 @@ jobs:
           ZSTD_LEVEL=10 \
           bash scripts/build.sh
 
+      - name: Run toolchain health check
+        run: bash scripts/toolchain-check.sh "$HOME/toolchains/oronyx"
+
+      - name: Strip toolchain (slim)
+        run: |
+          SLIM_ARGS=""
+          if [[ "${SLIM_AGGRESSIVE:-false}" == "true" ]]; then
+            SLIM_ARGS="--aggressive"
+          fi
+          if [[ "${SLIM_TOOLCHAIN:-true}" == "true" ]]; then
+            bash scripts/toolchain-slim.sh "$HOME/toolchains/oronyx" $SLIM_ARGS
+          else
+            echo "Slim disabled by preset"
+          fi
+
       - name: Package toolchain
         id: package
         run: bash scripts/package.sh
@@ -148,7 +163,7 @@ jobs:
           gh release create "$VERSION" \
             --repo "$GITHUB_REPOSITORY" \
             --title "Oronyx Clang $VERSION" \
-            --notes "Automated build for LLVM $VERSION" \
+            --notes "Oronyx Clang build for LLVM $VERSION" \
             --latest \
             "$TARBALL" \
             "${{ env.OUTPUT_DIR }}/clang-version.txt"
