@@ -268,7 +268,7 @@ jobs:
         run: |
           echo "BUILD_STAGE=Collecting build info" >> "$GITHUB_ENV"
           # Save LLVM commit BEFORE we delete the source
-          LLVM_COMMIT_HASH=$(git -C "$LLVM_DIR" rev-parse HEAD 2>/dev/null || echo "unknown")
+          LLVM_COMMIT_HASH=$(git -C "$LLVM_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")
           LLVM_COMMIT_FULL=$(git -C "$LLVM_DIR" rev-parse HEAD 2>/dev/null || echo "unknown")
           echo "LLVM_COMMIT_HASH=${LLVM_COMMIT_HASH}" >> "$GITHUB_ENV"
           echo "LLVM_COMMIT_FULL=${LLVM_COMMIT_FULL}" >> "$GITHUB_ENV"

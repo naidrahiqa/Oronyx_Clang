@@ -67,8 +67,8 @@ while IFS='|' read -r hash subject; do
   short_hash="${hash:0:7}"
   entry="  - $subject ($short_hash)"
   case "$subject" in
-    [CI]*)             ;; # Skip CI commits
-    [Dd]ocs:*)         ;;
+    [Cc][Ii]*)         ;; # Skip CI commits
+    [Dd]ocs:*)         OTHER="$OTHER\n$entry" ;;
     [Mm]erge*)         ;;
     [Rr]evert*)        FIX="$FIX\n$entry" ;;
     [Ff]ix*)           FIX="$FIX\n$entry" ;;
@@ -80,7 +80,7 @@ while IFS='|' read -r hash subject; do
     [Ii]mplement*)     FEAT="$FEAT\n$entry" ;;
     *)                 OTHER="$OTHER\n$entry" ;;
   esac
-done < <(git -C "$LLVM_DIR" log --pretty=format:"%h|%s" "$from_commit..$to_commit" 2>/dev/null | head -100)
+done < <(git -C "$LLVM_DIR" log --pretty=format:"%h|%s" "$from_commit..$to_commit" 2>/dev/null | head -500)
 
 print_section() {
   local emoji="$1" title="$2" content="$3"

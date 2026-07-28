@@ -203,7 +203,7 @@ $DIVIDER
 <b>Clang</b> <code>$CLANG_VERSION</code> · <b>Size</b> <code>$PACKAGE_SIZE</code>
 <b>Commit</b> <a href=\"https://github.com/llvm/llvm-project/commit/$LLVM_COMMIT_HASH\"><code>${LLVM_COMMIT_HASH:0:7}</code></a>
 $DIVIDER
-<pre><code>bash &lt;(wget -qO- https://raw.githubusercontent.com/naidrahiqa/Oronyx_Clang/main/get_clang.sh)</code></pre>
+<pre><code>bash &lt;(wget -qO- https://raw.githubusercontent.com/$REPO/main/get_clang.sh)</code></pre>
 $DIVIDER
 <b>SHA256</b> <code>${SHA256:0:16}...</code>
 <code>$SHA256</code>
