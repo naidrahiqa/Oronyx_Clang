@@ -74,8 +74,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Set LLVM branch from .llvm-version for scheduled builds
-        if: github.event_name == 'schedule'
+      - name: Set LLVM branch from .llvm-version for scheduled/push builds
+        if: github.event_name == 'schedule' || github.event_name == 'push'
         run: |
           BRANCH=$(cat .llvm-version 2>/dev/null | tr -d '[:space:]')
           echo "LLVM_BRANCH=${BRANCH}" >> "$GITHUB_ENV"
