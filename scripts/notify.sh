@@ -17,7 +17,7 @@ escape_html() {
 
 send_msg() {
   local text="$1"
-  curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
+  curl -s --fail -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
     -d chat_id="$CHAT_ID" \
     -d text="$text" \
     -d parse_mode="HTML" \
@@ -26,7 +26,7 @@ send_msg() {
 
 send_msg_to() {
   local cid="$1" text="$2"
-  curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
+  curl -s --fail -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
     -d chat_id="$cid" \
     -d text="$text" \
     -d parse_mode="HTML" \
@@ -120,7 +120,7 @@ $DIVIDER
     elif [[ -n "$ERROR_DUMP_FILE" && -f "$ERROR_DUMP_FILE" && -s "$ERROR_DUMP_FILE" ]]; then
       ERROR_FIRST_LINE=$(grep -i "error\|fatal\|failed" "$ERROR_DUMP_FILE" 2>/dev/null | head -1)
     fi
-    ERROR_FIRST_LINE=$(escape_html "$ERROR_FIRST_LINE" | grep -oP '^.{0,120}')
+    ERROR_FIRST_LINE=$(escape_html "$ERROR_FIRST_LINE" | sed -E 's/^(.{0,120}).*/\1/')
 
     MSG="<b>❌ OronyxClang #$RUN_NUMBER</b>
 $DIVIDER
@@ -153,7 +153,7 @@ $DIVIDER
     fi
 
     FULL_LOG=$(escape_html "$FULL_LOG")
-    ERROR_FIRST_LINE=$(escape_html "$ERROR_FIRST_LINE" | grep -oP '^.{0,150}')
+    ERROR_FIRST_LINE=$(escape_html "$ERROR_FIRST_LINE" | sed -E 's/^(.{0,150}).*/\1/')
 
     MSG="<b>🐛 Build #$RUN_NUMBER — Error Dump</b>
 $DIVIDER

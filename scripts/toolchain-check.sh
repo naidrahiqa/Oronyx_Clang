@@ -55,7 +55,6 @@ parse_args() {
       --help|-h) usage ;;
       *)
         TC_DIR="$1"
-        shift
         ;;
     esac
     shift

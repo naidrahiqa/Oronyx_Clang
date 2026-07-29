@@ -42,7 +42,7 @@ on:
       - '.github/workflows/**'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: build-${{ github.ref }}
@@ -60,13 +60,13 @@ env:
   OUTPUT_DIR: ${{ github.workspace }}/output
   RELEASE_TAG: oronyx-placeholder
   ZSTD_LEVEL: 10
-  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
 jobs:
   build:
     name: Build OronyxClang
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     timeout-minutes: 360
 
     steps:
@@ -94,10 +94,19 @@ jobs:
           echo "ORONYX_VERSION=${VERSION}" >> "$GITHUB_ENV"
           echo "Release tag: ${VERSION}"
 
+      - name: Validate release tag
+        if: env.RELEASE_TAG == 'oronyx-placeholder'
+        run: |
+          echo "RELEASE_TAG was not properly set — failing early"
+          exit 1
+
       - name: Count patches
         run: echo "PATCH_COUNT=$(ls -1 patches/*.patch 2>/dev/null | wc -l)" >> "$GITHUB_ENV"
 
       - name: Notify build started
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: bash scripts/notify.sh started
 
       - name: Free up disk space
@@ -295,12 +304,12 @@ jobs:
       # ── Package ──────────────────────────────────────────────────────────────
       - name: Strip toolchain (slim)
         run: |
-          SLIM_ARGS=""
+          SLIM_ARGS=()
           if [[ "${SLIM_AGGRESSIVE:-false}" == "true" ]]; then
-            SLIM_ARGS="--aggressive"
+            SLIM_ARGS+=(--aggressive)
           fi
           if [[ "${SLIM_TOOLCHAIN:-true}" == "true" ]]; then
-            bash scripts/toolchain-slim.sh "$INSTALL_DIR" $SLIM_ARGS
+            bash scripts/toolchain-slim.sh "$INSTALL_DIR" "${SLIM_ARGS[@]}"
           else
             echo "Slim disabled by preset"
           fi
@@ -351,25 +360,16 @@ jobs:
         if: ${{ github.event.inputs.release == 'true' || github.event_name == 'repository_dispatch' || github.event_name == 'push' }}
         env:
           GH_TOKEN: ${{ github.token }}
+          TARBALL: ${{ steps.package.outputs.TARBALL }}
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+          CLANG_VERSION: ${{ env.CLANG_VERSION }}
+          LLVM_COMMIT_HASH: ${{ env.LLVM_COMMIT_HASH }}
+          BUILD_MODE: ${{ env.BUILD_MODE }}
+          PATCH_COUNT: ${{ env.PATCH_COUNT }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TARBALL_NAME: ${{ steps.package.outputs.TARBALL_NAME }}
+          SHA256: ${{ env.SHA256 }}
         run: |
-          TARBALL="${{ steps.package.outputs.TARBALL }}"
-          TARBALL_NAME=$(basename "$TARBALL")
-
-          BUILD_MODE="Plain"
-          if [[ "$ENABLE_PGO" == "true" && "$ENABLE_BOLT" == "true" ]]; then
-            BUILD_MODE="PGO + BOLT"
-          elif [[ "$ENABLE_PGO" == "true" ]]; then
-            BUILD_MODE="PGO"
-          elif [[ "$ENABLE_BOLT" == "true" ]]; then
-            BUILD_MODE="BOLT"
-          fi
-
-          # Read changelog if available
-          CHANGELOG_SECTION=""
-          if [[ -s /tmp/llvm_changelog.md ]]; then
-            CHANGELOG_SECTION=$(cat /tmp/llvm_changelog.md)
-          fi
-
           # Build release body with placeholders, then substitute
           cat > /tmp/release_body.md << 'BODYEOF'
           ## Oronyx Clang @@RELEASE_TAG@@
@@ -426,14 +426,14 @@ jobs:
           Signed-off-by: OronyxCI <OronyxCI@users.noreply.github.com>
           BODYEOF
 
-          sed -i "s/@@RELEASE_TAG@@/${RELEASE_TAG}/g" /tmp/release_body.md
-          sed -i "s/@@CLANG_VERSION@@/${CLANG_VERSION}/g" /tmp/release_body.md
-          sed -i "s/@@LLVM_COMMIT_HASH@@/${LLVM_COMMIT_HASH}/g" /tmp/release_body.md
-          sed -i "s/@@BUILD_MODE@@/${BUILD_MODE}/g" /tmp/release_body.md
-          sed -i "s/@@PATCH_COUNT@@/${PATCH_COUNT}/g" /tmp/release_body.md
-          sed -i "s/@@REPO@@/${GITHUB_REPOSITORY}/g" /tmp/release_body.md
-          sed -i "s/@@TARBALL_NAME@@/${TARBALL_NAME}/g" /tmp/release_body.md
-          sed -i "s/@@SHA256@@/${SHA256}/g" /tmp/release_body.md
+          sed -i "s|@@RELEASE_TAG@@|${RELEASE_TAG}|g" /tmp/release_body.md
+          sed -i "s|@@CLANG_VERSION@@|${CLANG_VERSION}|g" /tmp/release_body.md
+          sed -i "s|@@LLVM_COMMIT_HASH@@|${LLVM_COMMIT_HASH}|g" /tmp/release_body.md
+          sed -i "s|@@BUILD_MODE@@|${BUILD_MODE}|g" /tmp/release_body.md
+          sed -i "s|@@PATCH_COUNT@@|${PATCH_COUNT}|g" /tmp/release_body.md
+          sed -i "s|@@REPO@@|${GITHUB_REPOSITORY}|g" /tmp/release_body.md
+          sed -i "s|@@TARBALL_NAME@@|${TARBALL_NAME}|g" /tmp/release_body.md
+          sed -i "s|@@SHA256@@|${SHA256}|g" /tmp/release_body.md
           # Replace changelog placeholder with actual content (escaping sed special chars)
           sed -i '/@@CHANGELOG_SECTION@@/{r /dev/stdin
             d}' /tmp/release_body.md <<< "$CHANGELOG_SECTION"
@@ -461,36 +461,44 @@ jobs:
           git config user.email "OronyxCI@users.noreply.github.com"
           git add get_latest_url.sh latest.txt clang-version.txt
           git diff --cached --quiet || git commit -m "chore: update release metadata [skip ci]"
-          git pull --rebase
-          git push
+          git push --force-with-lease origin "${{ github.ref_name }}"
 
       # ── Notifications ────────────────────────────────────────────────────────
       # Note: failure notification is handled by build.sh cleanup trap
       # (which has access to build.log and error context)
       - name: Notify build success
         if: success()
-        run: bash scripts/notify.sh success
         env:
           CLANG_VERSION: ${{ steps.package.outputs.CLANG_VERSION }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: bash scripts/notify.sh success
 
       - name: Notify release
         if: ${{ (github.event.inputs.release == 'true' || github.event_name == 'repository_dispatch') && success() }}
-        run: bash scripts/notify.sh release
         env:
           RELEASE_TAG: ${{ env.RELEASE_TAG }}
           TARBALL_NAME: ${{ steps.package.outputs.TARBALL_NAME }}
           PACKAGE_SIZE: ${{ env.PACKAGE_SIZE }}
           SHA256: ${{ env.SHA256 }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: bash scripts/notify.sh release
 
       - name: Notify changelog
         if: ${{ (github.event.inputs.release == 'true' || github.event_name == 'repository_dispatch') && success() }}
-        run: bash scripts/notify.sh changelog
         env:
           RELEASE_TAG: ${{ env.RELEASE_TAG }}
           CHANGELOG_FILE: /tmp/llvm_changelog.md
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: bash scripts/notify.sh changelog
 
       - name: Notify build failure
         if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           if [[ "${NOTIFIED_FAILURE:-false}" != "true" ]]; then
             bash scripts/notify.sh failure

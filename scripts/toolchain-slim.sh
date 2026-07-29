@@ -84,8 +84,7 @@ parse_args() {
       --verbose)    VERBOSE=true ;;
       --help|-h)    usage ;;
       -*)
-        [[ -z "$TC_DIR" ]] || die "Unknown option: $1"
-        TC_DIR="$1"
+        die "Unknown option: $1"
         ;;
       *)
         [[ -z "$TC_DIR" ]] || die "Unexpected argument: $1"
@@ -248,11 +247,11 @@ remove_headers() {
 
   if [[ -d "$TC_DIR/lib/clang" ]]; then
     # Remove headers but keep built-in modules / resource dir
-    find "$TC_DIR/lib/clang" -name "*.h" -type f -print0 2>/dev/null | while IFS= read -r -d '' f; do
+    while IFS= read -r -d '' f; do
       local sz; sz=$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null || echo 0)
       [[ "$DRY_RUN" == "true" ]] || rm -f "$f"
       saved=$((saved + sz))
-    done
+    done < <(find "$TC_DIR/lib/clang" -name "*.h" -type f -print0 2>/dev/null)
   fi
 
   local saved_hr

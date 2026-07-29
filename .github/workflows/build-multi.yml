@@ -21,19 +21,22 @@ on:
         default: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   parse-versions:
     name: Parse versions
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       matrix: ${{ steps.set.outputs.matrix }}
     steps:
       - name: Parse version list
         id: set
+        env:
+          VERSIONS: ${{ github.event.inputs.versions }}
         run: |
-          VERSIONS="${{ github.event.inputs.versions }}"
           # Convert comma-separated to JSON array
           MATRIX=$(echo "$VERSIONS" | jq -Rc 'split(",") | map(select(length > 0))')
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
@@ -44,6 +47,8 @@ jobs:
     needs: parse-versions
     runs-on: ubuntu-latest
     timeout-minutes: 360
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -55,14 +60,18 @@ jobs:
 
       - name: Set version info
         id: version
+        env:
+          LLVM_VERSION: ${{ matrix.llvm_version }}
         run: |
-          VERSION="${{ matrix.llvm_version }}"
+          VERSION="$LLVM_VERSION"
           echo "llvm_branch=llvmorg-${VERSION}" >> $GITHUB_OUTPUT
           echo "tag=${VERSION}" >> $GITHUB_OUTPUT
           echo "Building LLVM ${VERSION}"
 
       - name: Set output directory
-        run: echo "OUTPUT_DIR=${{ github.workspace }}/output" >> $GITHUB_ENV
+        env:
+          WORKSPACE: ${{ github.workspace }}
+        run: echo "OUTPUT_DIR=$WORKSPACE/output" >> $GITHUB_ENV
 
       - name: Free up disk space
         run: |
@@ -110,11 +119,12 @@ jobs:
             ${{ runner.os }}-ccache-
 
       - name: Run build
+        env:
+          LLVM_BRANCH: ${{ steps.version.outputs.llvm_branch }}
+          ENABLE_PGO: ${{ inputs.enable_pgo }}
+          ENABLE_BOLT: ${{ inputs.enable_bolt }}
+          ZSTD_LEVEL: 10
         run: |
-          LLVM_BRANCH="${{ steps.version.outputs.llvm_branch }}" \
-          ENABLE_PGO="${{ inputs.enable_pgo }}" \
-          ENABLE_BOLT="${{ inputs.enable_bolt }}" \
-          ZSTD_LEVEL=10 \
           bash scripts/build.sh
 
       - name: Run toolchain health check
@@ -122,12 +132,12 @@ jobs:
 
       - name: Strip toolchain (slim)
         run: |
-          SLIM_ARGS=""
+          SLIM_ARGS=()
           if [[ "${SLIM_AGGRESSIVE:-false}" == "true" ]]; then
-            SLIM_ARGS="--aggressive"
+            SLIM_ARGS+=(--aggressive)
           fi
           if [[ "${SLIM_TOOLCHAIN:-true}" == "true" ]]; then
-            bash scripts/toolchain-slim.sh "$HOME/toolchains/oronyx" $SLIM_ARGS
+            bash scripts/toolchain-slim.sh "$HOME/toolchains/oronyx" "${SLIM_ARGS[@]}"
           else
             echo "Slim disabled by preset"
           fi
@@ -152,18 +162,26 @@ jobs:
         if: inputs.release == true
         env:
           GH_TOKEN: ${{ github.token }}
+          TARBALL: ${{ steps.package.outputs.TARBALL }}
+          LLVM_VERSION: ${{ matrix.llvm_version }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          OUTPUT_DIR: ${{ env.OUTPUT_DIR }}
         run: |
-          TARBALL="${{ steps.package.outputs.TARBALL }}"
-          VERSION="${{ matrix.llvm_version }}"
-
-          # Delete existing release if exists
-          gh release delete "$VERSION" --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true
-          git push --delete origin "$VERSION" 2>/dev/null || true
-
-          gh release create "$VERSION" \
+          # Try create first; if tag exists, delete and retry
+          gh release create "$LLVM_VERSION" \
             --repo "$GITHUB_REPOSITORY" \
-            --title "Oronyx Clang $VERSION" \
-            --notes "Oronyx Clang build for LLVM $VERSION" \
-            --latest \
+            --title "Oronyx Clang $LLVM_VERSION" \
+            --notes "Oronyx Clang build for LLVM $LLVM_VERSION" \
             "$TARBALL" \
-            "${{ env.OUTPUT_DIR }}/clang-version.txt"
+            "$OUTPUT_DIR/clang-version.txt" 2>/dev/null || {
+            echo "Tag exists — deleting old release and retrying..."
+            gh release delete "$LLVM_VERSION" --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true
+            git push --delete origin "$LLVM_VERSION" 2>/dev/null || true
+
+            gh release create "$LLVM_VERSION" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Oronyx Clang $LLVM_VERSION" \
+              --notes "Oronyx Clang build for LLVM $LLVM_VERSION" \
+              "$TARBALL" \
+              "$OUTPUT_DIR/clang-version.txt"
+          }

@@ -18,7 +18,8 @@ mkdir -p "$PATCHES_DIR"
 # ─── Get current LLVM version from build.sh ────────────────────────────────
 get_current_version() {
   local branch
-  branch=$(grep -oP 'LLVM_BRANCH:-\K[^}]+' "$BUILD_SCRIPT" 2>/dev/null || echo "main")
+  branch=$(grep -oP '^LLVM_BRANCH="\K[^"]+' "$BUILD_SCRIPT" 2>/dev/null || \
+           grep -oP 'LLVM_BRANCH:-\K[^}]+' "$BUILD_SCRIPT" 2>/dev/null || echo "llvmorg-22.1.8")
   echo "$branch"
 }
 
@@ -93,13 +94,30 @@ main() {
   if [[ ! -d "$LLVM_DIR/.git" ]]; then
     log "Cloning LLVM for commit lookup..."
     git clone --filter=blob:none "$LLVM_REMOTE" "$LLVM_DIR"
-    # Fetch only the tags we need (current + latest) — no depth limit so git log tag1..tag2 works
-    if [[ "$current_version" != "main" ]]; then
-      git -C "$LLVM_DIR" fetch origin "refs/tags/$current_version:refs/tags/$current_version" 2>/dev/null || true
-    fi
-    if [[ -n "$latest_release" && "$latest_release" != "$current_version" ]]; then
-      git -C "$LLVM_DIR" fetch origin "refs/tags/$latest_release:refs/tags/$latest_release" 2>/dev/null || true
-    fi
+  fi
+
+  # Batch-fetch all relevant tags at once
+  local tags_to_fetch=()
+  if [[ "$current_version" != "main" ]]; then
+    tags_to_fetch+=("refs/tags/$current_version")
+  fi
+  if [[ -n "$latest_release" && "$latest_release" != "$current_version" ]]; then
+    tags_to_fetch+=("refs/tags/$latest_release")
+  fi
+  if [[ ${#tags_to_fetch[@]} -gt 0 ]]; then
+    git -C "$LLVM_DIR" fetch --force origin "${tags_to_fetch[@]}" 2>/dev/null || true
+  fi
+  # Checkout the most relevant tag: prefer latest_release over current_version
+  local checkout_tag=""
+  if [[ -n "$latest_release" && "$latest_release" != "$current_version" ]]; then
+    checkout_tag="$latest_release"
+  elif [[ "$current_version" != "main" ]]; then
+    checkout_tag="$current_version"
+  fi
+  if [[ -n "$checkout_tag" ]]; then
+    git -C "$LLVM_DIR" checkout -q "refs/tags/$checkout_tag" 2>/dev/null || \
+      git -C "$LLVM_DIR" checkout -q FETCH_HEAD 2>/dev/null || true
+  else
     git -C "$LLVM_DIR" checkout -q FETCH_HEAD 2>/dev/null || true
   fi
   
@@ -117,9 +135,9 @@ main() {
   
   if [[ -z "$commits" ]]; then
     log "No relevant commits found"
-    echo "applied=0" >> "${GITHUB_OUTPUT:-/dev/null}"
-    echo "skipped=0" >> "${GITHUB_OUTPUT:-/dev/null}"
-    echo "failed=0" >> "${GITHUB_OUTPUT:-/dev/null}"
+    [[ -n "${GITHUB_OUTPUT:-}" ]] && echo "applied=0" >> "$GITHUB_OUTPUT"
+    [[ -n "${GITHUB_OUTPUT:-}" ]] && echo "skipped=0" >> "$GITHUB_OUTPUT"
+    [[ -n "${GITHUB_OUTPUT:-}" ]] && echo "failed=0" >> "$GITHUB_OUTPUT"
     return 0
   fi
   
@@ -179,9 +197,9 @@ main() {
   log "Summary: $APPLIED applied, $SKIPPED skipped, $FAILED failed"
   
   # Output for GitHub Actions
-  echo "applied=$APPLIED" >> "${GITHUB_OUTPUT:-/dev/null}"
-  echo "skipped=$SKIPPED" >> "${GITHUB_OUTPUT:-/dev/null}"
-  echo "failed=$FAILED" >> "${GITHUB_OUTPUT:-/dev/null}"
+  [[ -n "${GITHUB_OUTPUT:-}" ]] && echo "applied=$APPLIED" >> "$GITHUB_OUTPUT"
+  [[ -n "${GITHUB_OUTPUT:-}" ]] && echo "skipped=$SKIPPED" >> "$GITHUB_OUTPUT"
+  [[ -n "${GITHUB_OUTPUT:-}" ]] && echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
 }
 
 main "$@"

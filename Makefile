@@ -56,16 +56,15 @@ build-android: ## Build from Android's LLVM fork
 .PHONY: lint
 lint: ## Run ShellCheck on all scripts
 	@echo "Running ShellCheck ..."
-	@find scripts/ -name "*.sh" -exec shellcheck --severity=warning {} + || true
-	@echo "Done."
+	@find scripts/ -name "*.sh" -exec shellcheck --severity=warning {} +
 
 .PHONY: lint-fix
 lint-fix: ## Run ShellCheck with auto-fix suggestions
-	@find scripts/ -name "*.sh" -exec shellcheck --fix --severity=info {} + || true
+	@find scripts/ -name "*.sh" -exec shellcheck --fix --severity=info {} +
 
 .PHONY: fmt
 fmt: ## Format shell scripts with shfmt
-	@find scripts/ -name "*.sh" -exec shfmt -w -ci -i 2 {} + || true
+	@find scripts/ -name "*.sh" -exec shfmt -w -ci -i 2 {} +
 
 .PHONY: check
 check: lint ## Run all checks (alias for lint)

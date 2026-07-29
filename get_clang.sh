@@ -60,8 +60,12 @@ fi
 
 # Fallback 2: GitHub API
 if [[ -z "$LATEST_URL" ]]; then
-  LATEST_URL=$(curl -sL "https://api.github.com/repos/$REPO/releases/latest" | \
-    grep -oP '"browser_download_url":\s*"\K[^"]+\.tar\.zst' | head -1 || true)
+  API_JSON=$(curl -sL --retry 3 "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null || true)
+  if command -v jq &>/dev/null; then
+    LATEST_URL=$(echo "$API_JSON" | jq -r '.assets[] | select(.name | endswith(".tar.zst")) | .browser_download_url' 2>/dev/null | head -1 || true)
+  else
+    LATEST_URL=$(echo "$API_JSON" | grep -oP '"browser_download_url":\s*"\K[^"]+\.tar\.zst' | head -1 || true)
+  fi
 fi
 
 if [[ -z "$LATEST_URL" ]]; then

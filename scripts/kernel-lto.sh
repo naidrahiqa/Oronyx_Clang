@@ -103,4 +103,6 @@ main() {
   log "Ready. Run your kernel make command now."
 }
 
-main
+echo -e "\033[1;33m[DEPRECATED]\033[0m kernel-lto.sh is deprecated. Use kernel-build.sh --lto=thin instead." >&2
+
+main "$@"

@@ -17,6 +17,11 @@ ZSTD_LEVEL="${ZSTD_LEVEL:-19}"
 PRESET="${PRESET:-}"
 
 # Load build preset if specified
+CONFIG_FILE="$(cd "$(dirname "$0")/.." && pwd)/config/build.conf"
+if [[ -f "$CONFIG_FILE" ]]; then
+  source "$CONFIG_FILE"
+fi
+
 PRESET_DIR="$(cd "$(dirname "$0")/.." && pwd)/config/presets"
 if [[ -n "$PRESET" ]]; then
   preset_file="$PRESET_DIR/${PRESET}.conf"
@@ -51,9 +56,9 @@ if [[ -z "${JOBS:-}" ]]; then
   [[ "$JOBS" -lt 1 ]] && JOBS=1
 fi
 
-LLVM_TARGETS="AArch64;ARM"
-LLVM_PROJECTS="clang;lld;compiler-rt;polly"
-LLVM_RUNTIMES=""
+LLVM_TARGETS="${LLVM_TARGETS:-AArch64;ARM}"
+LLVM_PROJECTS="${LLVM_PROJECTS:-clang;lld;compiler-rt;polly}"
+LLVM_RUNTIMES="${LLVM_RUNTIMES:-}"
 CLANG_VENDOR="${CLANG_VENDOR:-Oronyx Clang}"
 DEFAULT_TARGET_TRIPLE="${DEFAULT_TARGET_TRIPLE:-aarch64-linux-android}"
 
@@ -112,7 +117,11 @@ die() { echo -e "\033[1;31m[ERROR]\033[0m $*" >&2; exit 1; }
 check_disk_space() {
   local min_kb="$1" stage_name="$2"
   local avail_kb
-  avail_kb=$(df --output=avail / 2>/dev/null | tail -1 | tr -d ' ')
+  if df --output=avail / &>/dev/null; then
+    avail_kb=$(df --output=avail / 2>/dev/null | tail -1 | tr -d ' ')
+  else
+    avail_kb=$(df -P / 2>/dev/null | tail -1 | awk '{print $4}')
+  fi
   if [[ -n "$avail_kb" && "$avail_kb" -lt "$min_kb" ]]; then
     local avail_gb=$((avail_kb / 1048576))
     local need_gb=$((min_kb / 1048576))
@@ -242,8 +251,9 @@ clone_llvm() {
     warn "Clone attempt $attempt/$max_attempts failed"
     rm -rf "$LLVM_DIR" 2>/dev/null || true
     if [[ $attempt -lt $max_attempts ]]; then
-      log "Retrying in 5s ..."
-      sleep 5
+      local delay=$((attempt * 10))
+      log "Retrying in ${delay}s ..."
+      sleep "$delay"
     fi
   done
   die "Failed to clone LLVM after $max_attempts attempts"
@@ -781,7 +791,7 @@ stage3_build() {
     -DCMAKE_CXX_FLAGS="$arch_flags" \
     -DLLVM_ENABLE_LTO="$LTO_MODE" \
     -DCOMPILER_RT_ENABLE_LTO=OFF \
-    -DLLVM_PROFDATA_FILE="$PGO_PROF_2" \
+    -DLLVM_PROFDATA_FILE="${PGO_PROF_2:-}" \
     -DLLVM_ENABLE_PLUGINS=ON \
     -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
     -DCOMPILER_RT_BUILD_XRAY=OFF \
@@ -1163,11 +1173,6 @@ main() {
       if collect_profiles_stage2; then
         stage_timer_end "pgo_collect2"
 
-        # Cleanup stage2 install (save disk for stage3)
-        log "Cleaning Stage 2 install dir ..."
-        rm -rf "$STAGE2_INSTALL" 2>/dev/null || true
-        df -h / 2>/dev/null | tail -1 || true
-
         # ── Stage 3 (final) ──────────────────────────────────────────────────
         log "Available disk before Stage 3: $(df -h / | tail -1 | awk '{print $4}')"
         check_disk_space 8000000 "Stage 3"
@@ -1176,6 +1181,11 @@ main() {
         stage_timer_start "stage3"
         stage3_build
         stage_timer_end "stage3"
+
+        # Cleanup stage2 install AFTER stage3 uses it
+        log "Cleaning Stage 2 install dir ..."
+        rm -rf "$STAGE2_INSTALL" 2>/dev/null || true
+        df -h / 2>/dev/null | tail -1 || true
 
         BUILD_STAGE="BOLT optimization"
         export BUILD_STAGE
@@ -1190,7 +1200,10 @@ main() {
         if [[ -d "$STAGE2_INSTALL/bin" ]]; then
           log "Using Stage 2 build as final ..."
           mkdir -p "$INSTALL_DIR"
-          cp -r "$STAGE2_INSTALL"/* "$INSTALL_DIR/"
+          for _d in "$STAGE2_INSTALL"/* "$STAGE2_INSTALL"/.[!.]*; do
+            [[ -e "$_d" ]] && mv "$_d" "$INSTALL_DIR/"
+          done
+          rm -rf "$STAGE2_INSTALL" 2>/dev/null || true
           BUILD_STAGE="BOLT optimization"
           export BUILD_STAGE
           stage_timer_start "bolt"

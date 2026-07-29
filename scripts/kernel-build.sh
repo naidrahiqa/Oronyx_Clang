@@ -401,7 +401,7 @@ build_kernel() {
   else
     local build_log="$OUT_DIR/build.log"
     "${cmd[@]}" 2>&1 | tee "$build_log" | {
-      grep -E "^\*|error:|warning:|LD |OBJCOPY |CC |AR " || true
+      grep -E "^\*|^  (LD|OBJCOPY|CC|AR|AS) |^make\[|error:|warning:|fatal:" || true
     }
     local exit_code=${PIPESTATUS[0]}
     if [[ $exit_code -ne 0 ]]; then

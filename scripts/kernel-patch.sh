@@ -30,9 +30,9 @@ PATCH_DESCRIPTIONS=(
 # ─── KernelSU ──────────────────────────────────────────────────────────────
 patch_kernelsu() {
   log "Applying KernelSU ..."
-  local ksu_dir="$KERNEL_DIR/kernel/KernelSU"
-  if [[ -d "$ksu_dir" ]]; then
-    info "KernelSU already present at $ksu_dir"
+  local ksu_check_dir="$KERNEL_DIR/kernel/KernelSU"
+  if [[ -d "$ksu_check_dir" ]]; then
+    info "KernelSU already present at $ksu_check_dir"
     return 0
   fi
 
@@ -48,28 +48,31 @@ patch_kernelsu() {
     ksu_branch="legacy"
   fi
 
+  local ksu_dir="$KERNEL_DIR/kernel/KernelSU"
   info "  Cloning KernelSU ($ksu_branch branch) ..."
   git clone --depth=1 --branch="$ksu_branch" \
-    "https://github.com/tiann/KernelSU" "$KERNEL_DIR/KernelSU" 2>/dev/null || {
+    "https://github.com/tiann/KernelSU" "$ksu_dir" 2>/dev/null || {
     warn "  KernelSU clone failed (retrying with main)..."
-    git clone --depth=1 "https://github.com/tiann/KernelSU" "$KERNEL_DIR/KernelSU" 2>/dev/null || {
+    git clone --depth=1 "https://github.com/tiann/KernelSU" "$ksu_dir" 2>/dev/null || {
       warn "  KernelSU clone failed, skipping"
       return 1
     }
   }
 
   # Apply KernelSU to kernel
-  if [[ -f "$KERNEL_DIR/KernelSU/kernel/KernelSU/install.sh" ]]; then
+  if [[ -f "$ksu_dir/kernel/KernelSU/install.sh" ]]; then
     log "  Running KernelSU install.sh ..."
-    bash "$KERNEL_DIR/KernelSU/kernel/KernelSU/install.sh" 2>&1 | \
-      grep -v "^$" | sed 's/^/    /' || true
-  else
-    # Manual integration
-    warn "  Install script not found, performing manual integration ..."
-    if [[ -f "$KERNEL_DIR/KernelSU/kernel/Makefile" ]]; then
-      mkdir -p "$KERNEL_DIR/kernel"
-      ln -sf "$KERNEL_DIR/KernelSU/kernel" "$KERNEL_DIR/kernel/KernelSU" 2>/dev/null || true
+    local ksu_exit=0
+    bash "$ksu_dir/kernel/KernelSU/install.sh" 2>&1 | \
+      grep -v "^$" | sed 's/^/    /' || ksu_exit=$?
+    if [[ "$ksu_exit" -ne 0 ]]; then
+      warn "  KernelSU install.sh exited with code $ksu_exit — manual integration may be needed"
+      return 1
     fi
+  else
+    warn "  KernelSU install.sh not found at $ksu_dir/kernel/KernelSU/install.sh"
+    warn "  Clone may have an unexpected structure — skipping KernelSU integration"
+    return 1
   fi
 
   info "  KernelSU applied successfully!"
@@ -114,7 +117,7 @@ patch_wireguard() {
 
   # Copy WireGuard source into kernel
   mkdir -p "$KERNEL_DIR/drivers/net/wireguard"
-  cp -r "$wg_repo/src/"* "$KERNEL_DIR/drivers/net/wireguard/"
+  cp -r "$wg_repo/src/." "$KERNEL_DIR/drivers/net/wireguard/"
 
   # Add to Kconfig / Makefile if not present
   if ! grep -q "wireguard" "$KERNEL_DIR/drivers/net/Kconfig" 2>/dev/null; then
@@ -159,16 +162,16 @@ patch_sultan() {
     if git -C "$KERNEL_DIR" apply --check "$p" 2>/dev/null; then
       git -C "$KERNEL_DIR" apply "$p" 2>/dev/null && {
         info "  ✓ $name"
-        ((applied++))
+        ((applied++)) || true
       } || {
         warn "  ✗ $name (apply failed)"
-        ((skipped++))
+        ((skipped++)) || true
       }
     else
       if $VERBOSE; then
         warn "  - $name (doesn't apply cleanly, skipping)"
       fi
-      ((skipped++))
+      ((skipped++)) || true
     fi
   done
 

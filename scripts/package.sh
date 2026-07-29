@@ -25,8 +25,8 @@ CLANG_BIN="$INSTALL_DIR/bin/clang"
 [[ -x "$CLANG_BIN" ]] || die "clang binary not found at $CLANG_BIN"
 
 CLANG_VERSION=$("$CLANG_BIN" --version | head -1 | grep -oP '\d+\.\d+\.\d+\S*' | head -1)
-LLVM_COMMIT="${LLVM_COMMIT:-$(git -C "$LLVM_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")}"
-LLVM_COMMIT_FULL="${LLVM_COMMIT_FULL:-$(git -C "$LLVM_DIR" rev-parse HEAD 2>/dev/null || echo "unknown")}"
+LLVM_COMMIT="${LLVM_COMMIT:-$(git -C "${LLVM_DIR:-}" rev-parse --short HEAD 2>/dev/null || echo "unknown")}"
+LLVM_COMMIT_FULL="${LLVM_COMMIT_FULL:-$(git -C "${LLVM_DIR:-}" rev-parse HEAD 2>/dev/null || echo "unknown")}"
 BUILD_DATE=$(date -u +%Y-%m-%d)
 BUILD_DATE_COMPACT=$(date -u +%Y%m%d)
 

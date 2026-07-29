@@ -53,10 +53,10 @@ jobs:
 
       - name: Compare versions
         id: compare
+        env:
+          LATEST: ${{ steps.llvm.outputs.latest }}
+          LAST: ${{ steps.last.outputs.last }}
         run: |
-          LATEST="${{ steps.llvm.outputs.latest }}"
-          LAST="${{ steps.last.outputs.last }}"
-          
           if [ "$LATEST" != "$LAST" ]; then
             echo "New LLVM version available: $LATEST (was: ${LAST:-none})"
             echo "should_build=true" >> $GITHUB_OUTPUT
@@ -67,9 +67,11 @@ jobs:
 
       - name: Trigger build
         if: steps.compare.outputs.should_build == 'true'
+        env:
+          LATEST: ${{ steps.llvm.outputs.latest }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          LATEST="${{ steps.llvm.outputs.latest }}"
-          
           # Update version file
           echo "$LATEST" > .llvm-version
           
@@ -80,13 +82,11 @@ jobs:
           git commit -m "chore: update LLVM version to $LATEST"
           git push
           
-          # Trigger build workflow via repository_dispatch
-          echo "{\"event_type\": \"new-llvm-release\", \"client_payload\": {\"llvm_branch\": \"$LATEST\"}}" | \
-            gh api repos/${{ github.repository }}/dispatches --input -
+          # Trigger build workflow via repository_dispatch (safe JSON with jq)
+          echo "$LATEST" | jq -R '{event_type:"new-llvm-release",client_payload:{llvm_branch:.}}' | \
+            gh api repos/$GITHUB_REPOSITORY/dispatches --input -
           
           echo "Build triggered for $LATEST"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: No update
         if: steps.compare.outputs.should_build == 'false'
