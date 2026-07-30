@@ -716,7 +716,7 @@ stage2_build() {
 
   # Enable runtimes (libcxx, libcxxabi) for stage2 — the only stage that needs them.
   local saved_runtimes="$LLVM_RUNTIMES"
-  LLVM_RUNTIMES="libcxx;libcxxabi"
+  LLVM_RUNTIMES="libcxx;libcxxabi;libunwind"
 
   # Detect host CPU for native tuning flags
   local arch_flags=""
@@ -782,7 +782,7 @@ stage3_build() {
   local arch_flags="-march=native -mtune=native"
 
   local saved_runtimes="$LLVM_RUNTIMES"
-  LLVM_RUNTIMES="libcxx;libcxxabi"
+  LLVM_RUNTIMES="libcxx;libcxxabi;libunwind"
 
   cmake_configure "$LLVM_DIR" "$s3_build" "$INSTALL_DIR" "$LLVM_PROJECTS" "" \
     -DCMAKE_C_COMPILER="$STAGE2_INSTALL/bin/clang" \

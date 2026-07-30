@@ -353,11 +353,11 @@ jobs:
 
       # ── Release ──────────────────────────────────────────────────────────────
       - name: Set release stage
-        if: ${{ github.event.inputs.release == 'true' || github.event_name == 'repository_dispatch' || github.event_name == 'push' }}
+        if: ${{ github.event.inputs.release == 'true' || github.event_name == 'repository_dispatch' || github.event_name == 'push' || github.event_name == 'schedule' }}
         run: echo "BUILD_STAGE=Publishing Release" >> "$GITHUB_ENV"
 
       - name: Publish GitHub Release
-        if: ${{ github.event.inputs.release == 'true' || github.event_name == 'repository_dispatch' || github.event_name == 'push' }}
+        if: ${{ github.event.inputs.release == 'true' || github.event_name == 'repository_dispatch' || github.event_name == 'push' || github.event_name == 'schedule' }}
         env:
           GH_TOKEN: ${{ github.token }}
           TARBALL: ${{ steps.package.outputs.TARBALL }}
@@ -455,7 +455,7 @@ jobs:
 
       # ── Commit metadata to repo ───────────────────────────────────────────────
       - name: Commit metadata files
-        if: ${{ github.event.inputs.release == 'true' || github.event_name == 'repository_dispatch' || github.event_name == 'push' }}
+        if: ${{ github.event.inputs.release == 'true' || github.event_name == 'repository_dispatch' || github.event_name == 'push' || github.event_name == 'schedule' }}
         run: |
           git config user.name "OronyxCI"
           git config user.email "OronyxCI@users.noreply.github.com"
