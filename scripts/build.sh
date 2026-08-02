@@ -391,6 +391,13 @@ stage1_build() {
   # has a modern LTO-compatible linker and builtins to pass CMake compiler checks.
   local stage1_projects="clang;lld;compiler-rt"
 
+  # Stage 1 is only used for PGO profile collection and gets deleted afterwards —
+  # it does NOT need libcxx/libcxxabi/libunwind. Building runtimes here wastes time
+  # and fails when the preset's LLVM_RUNTIMES omits libunwind (LIBCXXABI
+  # requires it). Final runtimes are built in Stage 2/3 only.
+  local saved_runtimes="$LLVM_RUNTIMES"
+  LLVM_RUNTIMES=""
+
   cmake_configure "$LLVM_DIR" "$s1_build" "$s1_install" "$stage1_projects" "X86" \
     -DCMAKE_C_COMPILER="$HOST_CC" \
     -DCMAKE_CXX_COMPILER="$HOST_CXX" \
@@ -400,6 +407,8 @@ stage1_build() {
     -DCOMPILER_RT_BUILD_XRAY=OFF \
     -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
     -DCOMPILER_RT_BUILD_CRT=OFF
+
+  LLVM_RUNTIMES="$saved_runtimes"
 
   # Ensure just-built shared libraries are findable by child processes (runtimes cmake).
   local old_ld_path="${LD_LIBRARY_PATH:-}"

@@ -22,6 +22,16 @@ Common issues and solutions when using OronyxClang.
 - Ensure you're using the latest build.sh
 - The fix uses `CMAKE_LINKER` instead of `-DLLVM_USE_LINKER=lld`
 
+### "LIBCXXABI_USE_LLVM_UNWINDER is set to ON, but libunwind is not specified in LLVM_ENABLE_RUNTIMES"
+
+**Cause:** A stage is configured with runtimes (`libcxx;libcxxabi`) but without `libunwind`. libcxxabi auto-detects the in-tree libunwind and requires it to be listed in `LLVM_ENABLE_RUNTIMES`.
+
+**Solution:**
+- Stage 1 never needs runtimes — it is only used for PGO profile collection and its artifacts are deleted afterwards. It forces `LLVM_RUNTIMES=""` in `scripts/build.sh`.
+- Stage 2/3 build the final runtimes and must include `libunwind`: `LLVM_RUNTIMES="libcxx;libcxxabi;libunwind"` (see `config/presets/kernel.conf`, `config/presets/full.conf`).
+- If adding a new preset, always keep the runtimes list in sync: Stage 2/3 require the `libunwind` entry.
+- Alternatively pass `-DLIBCXXABI_USE_LLVM_UNWINDER=OFF`, but bundling libunwind is preferred since the toolchain is distributed without system libunwind guarantees.
+
 ### "git clone failed"
 
 **Cause:** Network issues on CI runners.

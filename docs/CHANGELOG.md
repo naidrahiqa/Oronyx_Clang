@@ -4,6 +4,15 @@ All notable changes to Oronyx Clang will be documented in this file.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- **Runtimes configure failure in Stage 1** — `LIBCXXABI_USE_LLVM_UNWINDER is set to ON, but libunwind is not specified in LLVM_ENABLE_RUNTIMES` when presets (`kernel`, `full`) set `LLVM_RUNTIMES="libcxx;libcxxabi"` without `libunwind`. Stage 1 no longer builds runtimes at all (`LLVM_RUNTIMES=""`) — it is only used for PGO profile collection and its artifacts are deleted afterwards. Final runtimes (with `libunwind`) are built in Stage 2/3.
+- **Preset consistency** — `config/presets/kernel.conf` and `config/presets/full.conf` now set `LLVM_RUNTIMES="libcxx;libcxxabi;libunwind"` to match what Stage 2/3 actually build.
+
+---
+
 ## [22.1.0] - 2026-06-29
 
 ### Changed
