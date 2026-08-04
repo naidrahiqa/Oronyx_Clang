@@ -19,6 +19,7 @@ TESTS_FAILED=0
 TESTS_SKIPPED=0
 
 test_pass() { ((TESTS_PASSED++)); }
+# shellcheck disable=SC2120
 test_fail() { ((TESTS_FAILED++)); warn "$*"; }
 test_skip() { ((TESTS_SKIPPED++)); }
 

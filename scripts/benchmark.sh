@@ -206,7 +206,8 @@ print_table() {
     printf "  %-25s" "$bin"
     for label in "${labels[@]}"; do
       local sizes_file="$results_dir/sizes-${label}.txt"
-      local val=$(grep "^${bin}:" "$sizes_file" 2>/dev/null | cut -d: -f2 || echo "-")
+      local val
+      val=$(grep "^${bin}:" "$sizes_file" 2>/dev/null | cut -d: -f2 || echo "-")
       if [[ "$val" != "-" ]]; then
         printf " %12s" "$(numfmt --to=iec "$val" 2>/dev/null || echo "$val")"
       else
@@ -253,7 +254,7 @@ compare_mode() {
     echo "$ver" > "$OUTPUT_DIR/version-${label}.txt"
 
     local sizes; sizes=$(collect_binary_sizes "$tc_dir")
-    > "$OUTPUT_DIR/sizes-${label}.txt"
+    true > "$OUTPUT_DIR/sizes-${label}.txt"
     for entry in $sizes; do
       echo "$entry" >> "$OUTPUT_DIR/sizes-${label}.txt"
     done
@@ -298,7 +299,7 @@ build_mode() {
       local ver_str; ver_str=$(collect_clang_version "$install_dir")
       echo "${ver_str} (build: ${duration}s)" > "$OUTPUT_DIR/version-${ver}.txt"
       local sizes; sizes=$(collect_binary_sizes "$install_dir")
-      > "$OUTPUT_DIR/sizes-${ver}.txt"
+      true > "$OUTPUT_DIR/sizes-${ver}.txt"
       for entry in $sizes; do echo "$entry" >> "$OUTPUT_DIR/sizes-${ver}.txt"; done
       bench_kernel "$install_dir" "$ver"
     fi

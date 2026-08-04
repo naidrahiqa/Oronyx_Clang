@@ -19,6 +19,7 @@ PRESET="${PRESET:-}"
 # Load build preset if specified
 CONFIG_FILE="$(cd "$(dirname "$0")/.." && pwd)/config/build.conf"
 if [[ -f "$CONFIG_FILE" ]]; then
+  # shellcheck source=/dev/null
   source "$CONFIG_FILE"
 fi
 
@@ -27,6 +28,7 @@ if [[ -n "$PRESET" ]]; then
   preset_file="$PRESET_DIR/${PRESET}.conf"
   if [[ -f "$preset_file" ]]; then
     echo -e "\033[1;35m[Preset]\033[0m Loading preset: $PRESET ($preset_file)"
+    # shellcheck source=/dev/null
     source "$preset_file"
   else
     echo -e "\033[1;31m[ERROR]\033[0m Preset '$PRESET' not found at $preset_file"
