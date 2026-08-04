@@ -1156,6 +1156,7 @@ main() {
   rm -rf "$LLVM_DIR/lld/test" 2>/dev/null || true
   rm -rf "$LLVM_DIR/compiler-rt/test" 2>/dev/null || true
   rm -rf "$LLVM_DIR/polly/test" 2>/dev/null || true
+  rm -rf "$LLVM_DIR/docs" 2>/dev/null || true
   rm -rf "$LLVM_DIR/llvm/docs" 2>/dev/null || true
   rm -rf "$LLVM_DIR/clang/docs" 2>/dev/null || true
   rm -rf "$LLVM_DIR/llvm/examples" 2>/dev/null || true

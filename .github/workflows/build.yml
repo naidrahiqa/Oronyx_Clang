@@ -114,6 +114,7 @@ jobs:
           echo "BUILD_STAGE=Freeing disk space" >> "$GITHUB_ENV"
           echo "=== Initial disk usage ==="
           df -h /
+
           echo "=== Removing runner diagnostic logs ==="
           rm -rf /home/runner/actions-runner/cached/*/_diag/*.log 2>/dev/null || true
           rm -rf /home/runner/actions-runner/_diag/*.log 2>/dev/null || true
@@ -125,58 +126,39 @@ jobs:
             /opt/ghc \
             /usr/local/share/powershell \
             /usr/local/share/boost \
-            "$AGENT_TOOLSDIRECTORY" \
             /usr/local/lib/android \
             /usr/local/lib/node_modules \
-            /opt/hostedtoolcache/CodeQL \
-            /opt/hostedtoolcache/Python \
-            /opt/hostedtoolcache/Ruby \
-            /opt/hostedtoolcache/Go \
-            /opt/hostedtoolcache/Java \
-            /opt/hostedtoolcache/PHP \
-            /opt/hostedtoolcache/Boost \
-            /opt/hostedtoolcache/CMake \
-            /opt/hostedtoolcache/Miniconda \
-            /opt/hostedtoolcache/PyPy \
             /usr/local/lib/heroku \
             /usr/local/share/chromium \
-            /usr/share/miniconda \
+            /usr/local/share/vcpkg \
+            /usr/local/share/gradle \
+            /usr/local/share/sbt \
+            /usr/local/graalvm \
+            /usr/local/julia \
+            /usr/local/texlive \
             /usr/local/lib/R \
             /usr/local/.ghcup \
-            /usr/local/julia* \
-            /usr/local/texlive \
+            /usr/share/miniconda \
+            /usr/share/kotlinc \
             /usr/share/az_* \
             /opt/az \
             /opt/microsoft \
             /opt/mssql \
-            /usr/share/kotlinc \
-            /usr/local/share/gradle* \
-            /usr/local/share/sbt \
-            /usr/local/share/powershell \
-            /usr/local/graalvm \
-            /usr/local/lib/android \
-            /usr/local/share/vcpkg
+            /opt/hostedtoolcache
+
+          # Remove AGENT_TOOLSDIRECTORY if set (GitHub Actions tool cache)
+          [[ -n "${AGENT_TOOLSDIRECTORY:-}" ]] && sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
 
           echo "=== Removing home caches ==="
-          rm -rf /home/runner/.cache 2>/dev/null || true
-          rm -rf /home/runner/.npm 2>/dev/null || true
-          rm -rf /home/runner/.cargo 2>/dev/null || true
-          rm -rf /home/runner/.dotnet 2>/dev/null || true
-          rm -rf /home/runner/.rustup 2>/dev/null || true
-          rm -rf /home/runner/.local/share 2>/dev/null || true
-          rm -rf /home/runner/go 2>/dev/null || true
+          rm -rf /home/runner/.cache /home/runner/.npm /home/runner/.cargo \
+                 /home/runner/.dotnet /home/runner/.rustup /home/runner/.local/share \
+                 /home/runner/go 2>/dev/null || true
 
           echo "=== Purging large apt packages ==="
           sudo apt-get purge -y \
-            azure-cli \
-            google-cloud-sdk \
-            google-cloud-cli \
-            google-chrome-stable \
-            microsoft-edge-stable \
-            firefox \
-            mono-devel \
-            msbuild \
-            libmono-* \
+            azure-cli google-cloud-sdk google-cloud-cli \
+            google-chrome-stable microsoft-edge-stable firefox \
+            mono-devel msbuild 'libmono-*' \
             &>/dev/null || true
           sudo apt-get autoremove -y &>/dev/null || true
 
@@ -184,59 +166,21 @@ jobs:
           docker rmi $(docker images -q) 2>/dev/null || true
           sudo rm -rf /var/lib/docker
 
-          echo "=== Removing apt caches ==="
+          echo "=== Removing apt/snap/temp caches ==="
           sudo apt-get clean
-          sudo rm -rf /var/lib/apt/lists/*
-
-          echo "=== Removing snap packages ==="
+          sudo rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
           sudo snap list --no-legend 2>/dev/null | awk '{print $1}' | xargs -I{} sudo snap remove --purge {} 2>/dev/null || true
 
-          echo "=== Removing temp files ==="
-          sudo rm -rf /tmp/* /var/tmp/*
-
-          echo "=== Removing doc/locale (saves ~1GB) ==="
-          sudo rm -rf /usr/share/doc /usr/share/man /usr/share/locale /usr/share/info 2>/dev/null || true
-          sudo rm -rf /usr/local/share/doc /usr/local/share/man 2>/dev/null || true
-
-          echo "=== Removing leftover swap/hibernation ==="
+          echo "=== Removing doc/locale/swap/logs ==="
+          sudo rm -rf /usr/share/doc /usr/share/man /usr/share/locale /usr/share/info \
+                      /usr/local/share/doc /usr/local/share/man 2>/dev/null || true
           sudo swapoff -a 2>/dev/null || true
           sudo rm -f /swapfile /swap.img 2>/dev/null || true
-
-          echo "=== Removing large logs ==="
           sudo find /var/log -type f -name "*.log" -mtime +1 -exec truncate -s 0 {} \; 2>/dev/null || true
           sudo journalctl --rotate --vacuum-time=1s 2>/dev/null || true
 
-          echo "=== Removing more system packages to free space ==="
-          sudo rm -rf /usr/local/lib/android 2>/dev/null || true
-          sudo rm -rf /opt/hostedtoolcache 2>/dev/null || true
-          sudo rm -rf /usr/local/lib/node_modules 2>/dev/null || true
-          sudo rm -rf /usr/local/lib/heroku 2>/dev/null || true
-          sudo rm -rf /usr/local/share/vcpkg 2>/dev/null || true
-          sudo rm -rf /usr/local/share/chromium 2>/dev/null || true
-          sudo rm -rf /usr/local/julia* 2>/dev/null || true
-          sudo rm -rf /usr/local/texlive 2>/dev/null || true
-          sudo rm -rf /usr/local/graalvm 2>/dev/null || true
-          sudo rm -rf /usr/local/lib/R 2>/dev/null || true
-          sudo rm -rf /usr/local/.ghcup 2>/dev/null || true
-          sudo rm -rf /usr/share/miniconda 2>/dev/null || true
-          sudo rm -rf /usr/share/kotlinc 2>/dev/null || true
-          sudo rm -rf /usr/local/share/gradle* 2>/dev/null || true
-          sudo rm -rf /usr/local/share/sbt 2>/dev/null || true
-          sudo rm -rf /usr/local/share/powershell 2>/dev/null || true
-          sudo rm -rf /usr/share/az_* 2>/dev/null || true
-          sudo rm -rf /opt/az 2>/dev/null || true
-          sudo rm -rf /opt/microsoft 2>/dev/null || true
-          sudo rm -rf /opt/mssql 2>/dev/null || true
-
-          echo "=== Removing /usr/local/lib subdirectories ==="
-          sudo rm -rf /usr/local/lib/android 2>/dev/null || true
-          sudo rm -rf /usr/local/lib/heroku 2>/dev/null || true
-          sudo rm -rf /usr/local/lib/node_modules 2>/dev/null || true
-
-          echo "=== Removing /usr/local/bin non-essential ==="
-          sudo rm -f /usr/local/bin/node /usr/local/bin/npm /usr/local/bin/npx 2>/dev/null || true
-          sudo rm -f /usr/local/bin/pip /usr/local/bin/pip3 2>/dev/null || true
-          sudo rm -f /usr/local/bin/gradle /usr/local/bin/mvn 2>/dev/null || true
+          echo "=== Removing non-essential /usr/local/bin ==="
+          sudo rm -f /usr/local/bin/{node,npm,npx,pip,pip3,gradle,mvn} 2>/dev/null || true
 
           echo "=== Resize ccache to minimum ==="
           ccache --set-config=max_size=500M 2>/dev/null || true
@@ -285,18 +229,22 @@ jobs:
       - name: Trim LLVM git cache after restore
         if: steps.cache-llvm.outputs.cache-hit == 'true'
         run: |
-          if [[ -d "${{ github.workspace }}/llvm-project/.git" ]]; then
+          LLVM_DIR="${{ github.workspace }}/llvm-project"
+          if [[ -d "$LLVM_DIR/.git" ]]; then
             echo "Pruning LLVM git objects to save disk space ..."
-            git -C "${{ github.workspace }}/llvm-project" gc --aggressive --prune=now 2>/dev/null || true
-            git -C "${{ github.workspace }}/llvm-project" reflog expire --expire=now --all 2>/dev/null || true
-            rm -rf "${{ github.workspace }}/llvm-project/.git/refs/remotes" 2>/dev/null || true
-            rm -rf "${{ github.workspace }}/llvm-project/.git/logs" 2>/dev/null || true
-            rm -rf "${{ github.workspace }}/llvm-project/.git/hooks" 2>/dev/null || true
-            rm -rf "${{ github.workspace }}/llvm-project/.git/info" 2>/dev/null || true
-            rm -rf "${{ github.workspace }}/llvm-project/.git/rr-cache" 2>/dev/null || true
-            rm -rf "${{ github.workspace }}/llvm-project/.git/merge/head" 2>/dev/null || true
+            git -C "$LLVM_DIR" gc --aggressive --prune=now 2>/dev/null || true
+            git -C "$LLVM_DIR" reflog expire --expire=now --all 2>/dev/null || true
+            rm -rf "$LLVM_DIR/.git/refs/remotes" "$LLVM_DIR/.git/logs" \
+                   "$LLVM_DIR/.git/hooks" "$LLVM_DIR/.git/info" \
+                   "$LLVM_DIR/.git/rr-cache" "$LLVM_DIR/.git/merge" 2>/dev/null || true
             echo "After git prune:"
-            du -sh "${{ github.workspace }}/llvm-project/.git" 2>/dev/null || true
+            du -sh "$LLVM_DIR/.git" 2>/dev/null || true
+          fi
+
+          # Validate cached source is usable
+          if [[ ! -f "$LLVM_DIR/llvm/CMakeLists.txt" ]]; then
+            echo "WARNING: Cached LLVM source appears corrupted, will re-clone"
+            rm -rf "$LLVM_DIR"
           fi
 
       # ── Build ────────────────────────────────────────────────────────────────
