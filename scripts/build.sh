@@ -1148,19 +1148,21 @@ main() {
   export LLVM_COMMIT LLVM_COMMIT_FULL
 
   # Aggressively clean LLVM source tree to save disk space
-  log "Cleaning LLVM source tree (removing tests, docs, examples) ..."
+  log "Cleaning LLVM source tree (removing tests, docs content, examples) ..."
   rm -rf "$LLVM_DIR/llvm/test" 2>/dev/null || true
   rm -rf "$LLVM_DIR/clang/test" 2>/dev/null || true
   rm -rf "$LLVM_DIR/lld/test" 2>/dev/null || true
   rm -rf "$LLVM_DIR/compiler-rt/test" 2>/dev/null || true
   rm -rf "$LLVM_DIR/polly/test" 2>/dev/null || true
-  rm -rf "$LLVM_DIR/docs" 2>/dev/null || true
   rm -rf "$LLVM_DIR/llvm/docs" 2>/dev/null || true
   rm -rf "$LLVM_DIR/clang/docs" 2>/dev/null || true
   rm -rf "$LLVM_DIR/llvm/examples" 2>/dev/null || true
   rm -rf "$LLVM_DIR/clang/examples" 2>/dev/null || true
   rm -rf "$LLVM_DIR/llvm/utils/lit" 2>/dev/null || true
   rm -rf "$LLVM_DIR/llvm/unittests" 2>/dev/null || true
+  # Create empty stub dirs for CMake add_subdirectory calls that expect them
+  mkdir -p "$LLVM_DIR/docs" "$LLVM_DIR/llvm/docs" "$LLVM_DIR/clang/docs" \
+           "$LLVM_DIR/llvm/examples" "$LLVM_DIR/clang/examples"
   df -h / 2>/dev/null | tail -1 || true
 
   BUILD_STAGE="Applying patches"
