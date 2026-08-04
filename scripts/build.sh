@@ -1162,9 +1162,12 @@ main() {
   rm -rf "$LLVM_DIR/clang/examples" 2>/dev/null || true
   rm -rf "$LLVM_DIR/llvm/utils/lit" 2>/dev/null || true
   rm -rf "$LLVM_DIR/llvm/unittests" 2>/dev/null || true
-  # Create empty stub dirs for CMake add_subdirectory calls that expect them
-  mkdir -p "$LLVM_DIR/docs" "$LLVM_DIR/llvm/docs" "$LLVM_DIR/clang/docs" \
-           "$LLVM_DIR/llvm/examples" "$LLVM_DIR/clang/examples"
+  # Create empty stub dirs + CMakeLists.txt for CMake add_subdirectory calls
+  for _stub in "$LLVM_DIR/docs" "$LLVM_DIR/llvm/docs" "$LLVM_DIR/clang/docs" \
+               "$LLVM_DIR/llvm/examples" "$LLVM_DIR/clang/examples"; do
+    mkdir -p "$_stub"
+    echo "# Intentionally empty" > "$_stub/CMakeLists.txt"
+  done
   df -h / 2>/dev/null | tail -1 || true
 
   BUILD_STAGE="Applying patches"
