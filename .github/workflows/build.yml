@@ -206,6 +206,38 @@ jobs:
           sudo find /var/log -type f -name "*.log" -mtime +1 -exec truncate -s 0 {} \; 2>/dev/null || true
           sudo journalctl --rotate --vacuum-time=1s 2>/dev/null || true
 
+          echo "=== Removing more system packages to free space ==="
+          sudo rm -rf /usr/local/lib/android 2>/dev/null || true
+          sudo rm -rf /opt/hostedtoolcache 2>/dev/null || true
+          sudo rm -rf /usr/local/lib/node_modules 2>/dev/null || true
+          sudo rm -rf /usr/local/lib/heroku 2>/dev/null || true
+          sudo rm -rf /usr/local/share/vcpkg 2>/dev/null || true
+          sudo rm -rf /usr/local/share/chromium 2>/dev/null || true
+          sudo rm -rf /usr/local/julia* 2>/dev/null || true
+          sudo rm -rf /usr/local/texlive 2>/dev/null || true
+          sudo rm -rf /usr/local/graalvm 2>/dev/null || true
+          sudo rm -rf /usr/local/lib/R 2>/dev/null || true
+          sudo rm -rf /usr/local/.ghcup 2>/dev/null || true
+          sudo rm -rf /usr/share/miniconda 2>/dev/null || true
+          sudo rm -rf /usr/share/kotlinc 2>/dev/null || true
+          sudo rm -rf /usr/local/share/gradle* 2>/dev/null || true
+          sudo rm -rf /usr/local/share/sbt 2>/dev/null || true
+          sudo rm -rf /usr/local/share/powershell 2>/dev/null || true
+          sudo rm -rf /usr/share/az_* 2>/dev/null || true
+          sudo rm -rf /opt/az 2>/dev/null || true
+          sudo rm -rf /opt/microsoft 2>/dev/null || true
+          sudo rm -rf /opt/mssql 2>/dev/null || true
+
+          echo "=== Removing /usr/local/lib subdirectories ==="
+          sudo rm -rf /usr/local/lib/android 2>/dev/null || true
+          sudo rm -rf /usr/local/lib/heroku 2>/dev/null || true
+          sudo rm -rf /usr/local/lib/node_modules 2>/dev/null || true
+
+          echo "=== Removing /usr/local/bin non-essential ==="
+          sudo rm -f /usr/local/bin/node /usr/local/bin/npm /usr/local/bin/npx 2>/dev/null || true
+          sudo rm -f /usr/local/bin/pip /usr/local/bin/pip3 2>/dev/null || true
+          sudo rm -f /usr/local/bin/gradle /usr/local/bin/mvn 2>/dev/null || true
+
           echo "=== Resize ccache to minimum ==="
           ccache --set-config=max_size=500M 2>/dev/null || true
 
@@ -237,10 +269,11 @@ jobs:
       - name: Configure ccache
         run: |
           mkdir -p ~/.cache/ccache
-          ccache --set-config=max_size=2.0G
+          ccache --set-config=max_size=500M
           ccache -s
 
       - name: Cache LLVM source
+        id: cache-llvm
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/llvm-project
@@ -248,6 +281,23 @@ jobs:
           restore-keys: |
             llvm-source-${{ env.LLVM_BRANCH }}-
             llvm-source-
+
+      - name: Trim LLVM git cache after restore
+        if: steps.cache-llvm.outputs.cache-hit == 'true'
+        run: |
+          if [[ -d "${{ github.workspace }}/llvm-project/.git" ]]; then
+            echo "Pruning LLVM git objects to save disk space ..."
+            git -C "${{ github.workspace }}/llvm-project" gc --aggressive --prune=now 2>/dev/null || true
+            git -C "${{ github.workspace }}/llvm-project" reflog expire --expire=now --all 2>/dev/null || true
+            rm -rf "${{ github.workspace }}/llvm-project/.git/refs/remotes" 2>/dev/null || true
+            rm -rf "${{ github.workspace }}/llvm-project/.git/logs" 2>/dev/null || true
+            rm -rf "${{ github.workspace }}/llvm-project/.git/hooks" 2>/dev/null || true
+            rm -rf "${{ github.workspace }}/llvm-project/.git/info" 2>/dev/null || true
+            rm -rf "${{ github.workspace }}/llvm-project/.git/rr-cache" 2>/dev/null || true
+            rm -rf "${{ github.workspace }}/llvm-project/.git/merge/head" 2>/dev/null || true
+            echo "After git prune:"
+            du -sh "${{ github.workspace }}/llvm-project/.git" 2>/dev/null || true
+          fi
 
       # ── Build ────────────────────────────────────────────────────────────────
       - name: Make scripts executable

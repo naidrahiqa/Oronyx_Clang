@@ -13,7 +13,7 @@ ENABLE_PGO="${ENABLE_PGO:-true}"
 ENABLE_BOLT="${ENABLE_BOLT:-true}"
 PGO_WORKLOAD="${PGO_WORKLOAD:-sqlite}"
 LTO_MODE="${LTO_MODE:-Thin}"
-ZSTD_LEVEL="${ZSTD_LEVEL:-19}"
+ZSTD_LEVEL="${ZSTD_LEVEL:-10}"
 PRESET="${PRESET:-}"
 
 # Load build preset if specified
@@ -689,12 +689,15 @@ cleanup_stage1_artifacts() {
     log "Cleaned up stage1-install"
   fi
 
-  # Prune LLVM git aggressively (saves ~1GB)
+  # Prune LLVM git aggressively (saves ~1GB) — skip if .git already removed
   if [[ -d "$LLVM_DIR/.git" ]]; then
     log "Pruning LLVM git objects ..."
-    git -C "$LLVM_DIR" gc --auto 2>/dev/null || true
-    # Remove reflog + stash to free more space
+    git -C "$LLVM_DIR" gc --aggressive --prune=now 2>/dev/null || true
     git -C "$LLVM_DIR" reflog expire --expire=now --all 2>/dev/null || true
+    rm -rf "$LLVM_DIR/.git/refs/remotes" 2>/dev/null || true
+    rm -rf "$LLVM_DIR/.git/logs" 2>/dev/null || true
+    rm -rf "$LLVM_DIR/.git/hooks" 2>/dev/null || true
+    rm -rf "$LLVM_DIR/.git/info" 2>/dev/null || true
   fi
 
   # Clear ccache stats cache
@@ -702,6 +705,11 @@ cleanup_stage1_artifacts() {
 
   # Remove ThinLTO cache from stage1 (not needed for stage2)
   rm -rf "$BUILD_DIR/lto-cache" 2>/dev/null || true
+
+  # Aggressively free more space
+  sudo apt-get clean 2>/dev/null || true
+  sudo rm -rf /var/lib/apt/lists/* 2>/dev/null || true
+  sudo rm -rf /tmp/* 2>/dev/null || true
 
   df -h / 2>/dev/null | tail -1 || true
   log "Disk cleanup complete"
@@ -761,10 +769,12 @@ stage2_build() {
 
   # Free disk BEFORE install: remove object files + ThinLTO cache
   # Do NOT delete $s2_build/lib — cmake --install needs cmake_install.cmake scripts there
-  log "Stage 2 build done. Cleaning object files before install ..."
+  log "Stage 2 build done. Cleaning object files + LTO cache before install ..."
   find "$s2_build" -name "*.o" -delete 2>/dev/null || true
   find "$s2_build" -name "*.obj" -delete 2>/dev/null || true
   rm -rf "$BUILD_DIR/lto-cache" 2>/dev/null || true
+  sudo apt-get clean 2>/dev/null || true
+  sudo rm -rf /var/lib/apt/lists/* /tmp/* 2>/dev/null || true
   df -h / 2>/dev/null | tail -1 || true
 
   cmake --install "$s2_build" 2>&1 | tee -a "$BUILD_DIR/build.log"
@@ -815,10 +825,12 @@ stage3_build() {
   cmake --build "$s3_build" -j"$JOBS" 2>&1 | tee -a "$BUILD_DIR/build.log"
   export LD_LIBRARY_PATH="$old_ld_path"
 
-  log "Stage 3 build done. Cleaning object files before install ..."
+  log "Stage 3 build done. Cleaning object files + LTO cache before install ..."
   find "$s3_build" -name "*.o" -delete 2>/dev/null || true
   find "$s3_build" -name "*.obj" -delete 2>/dev/null || true
   rm -rf "$BUILD_DIR/lto-cache" 2>/dev/null || true
+  sudo apt-get clean 2>/dev/null || true
+  sudo rm -rf /var/lib/apt/lists/* /tmp/* 2>/dev/null || true
   df -h / 2>/dev/null | tail -1 || true
 
   cmake --install "$s3_build" 2>&1 | tee -a "$BUILD_DIR/build.log"
@@ -1130,9 +1142,26 @@ main() {
   clone_llvm
   stage_timer_end "clone"
 
-  # Now we can get the actual commit
+  # Get commit hash BEFORE cleaning up .git
   LLVM_COMMIT=$(git -C "$LLVM_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")
-  export LLVM_COMMIT
+  LLVM_COMMIT_FULL=$(git -C "$LLVM_DIR" rev-parse HEAD 2>/dev/null || echo "unknown")
+  export LLVM_COMMIT LLVM_COMMIT_FULL
+
+  # Aggressively clean LLVM source tree to save disk space
+  log "Cleaning LLVM source tree (removing tests, docs, examples) ..."
+  rm -rf "$LLVM_DIR/llvm/test" 2>/dev/null || true
+  rm -rf "$LLVM_DIR/clang/test" 2>/dev/null || true
+  rm -rf "$LLVM_DIR/lld/test" 2>/dev/null || true
+  rm -rf "$LLVM_DIR/compiler-rt/test" 2>/dev/null || true
+  rm -rf "$LLVM_DIR/polly/test" 2>/dev/null || true
+  rm -rf "$LLVM_DIR/docs" 2>/dev/null || true
+  rm -rf "$LLVM_DIR/llvm/docs" 2>/dev/null || true
+  rm -rf "$LLVM_DIR/clang/docs" 2>/dev/null || true
+  rm -rf "$LLVM_DIR/llvm/examples" 2>/dev/null || true
+  rm -rf "$LLVM_DIR/clang/examples" 2>/dev/null || true
+  rm -rf "$LLVM_DIR/llvm/utils/lit" 2>/dev/null || true
+  rm -rf "$LLVM_DIR/llvm/unittests" 2>/dev/null || true
+  df -h / 2>/dev/null | tail -1 || true
 
   BUILD_STAGE="Applying patches"
   export BUILD_STAGE
@@ -1140,9 +1169,10 @@ main() {
   apply_patches
   stage_timer_end "patches"
 
-  # Refresh commit after patching
-  LLVM_COMMIT=$(git -C "$LLVM_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")
-  export LLVM_COMMIT
+  # Now remove .git AFTER patches applied (git apply needs it)
+  rm -rf "$LLVM_DIR/.git" 2>/dev/null || true
+  log "Removed LLVM .git directory"
+  df -h / 2>/dev/null | tail -1 || true
 
   BUILD_SUCCESS=false
   if [[ "$ENABLE_PGO" == "true" ]]; then
@@ -1164,9 +1194,24 @@ main() {
       stage_timer_end "pgo_collect"
       cleanup_stage1_artifacts
 
+      # ── Aggressive disk cleanup before Stage 2 ─────────────────────────────
+      log "Performing aggressive disk cleanup before Stage 2 ..."
+      rm -rf "$BUILD_DIR/lto-cache" 2>/dev/null || true
+      rm -rf "$BUILD_DIR/profiles" 2>/dev/null || true
+      rm -rf "$BUILD_DIR/workload" 2>/dev/null || true
+      rm -f "$BUILD_DIR/.ccache_stats" 2>/dev/null || true
+      sudo apt-get clean 2>/dev/null || true
+      sudo rm -rf /var/lib/apt/lists/* /tmp/* 2>/dev/null || true
+      # Prune ccache to minimum
+      if command -v ccache &>/dev/null; then
+        ccache --set-config=max_size=500M 2>/dev/null || true
+        ccache -c 2>/dev/null || true
+      fi
+      df -h / 2>/dev/null | tail -1 || true
+
       # ── Stage 2 (intermediate) ─────────────────────────────────────────────
       log "Available disk before Stage 2: $(df -h / | tail -1 | awk '{print $4}')"
-      check_disk_space 8000000 "Stage 2"
+      check_disk_space 6000000 "Stage 2"
       BUILD_STAGE="Stage 2: Optimized build (intermediate)"
       export BUILD_STAGE
       stage_timer_start "stage2"
@@ -1182,9 +1227,20 @@ main() {
       if collect_profiles_stage2; then
         stage_timer_end "pgo_collect2"
 
+        # ── Aggressive disk cleanup before Stage 3 ──────────────────────────
+        log "Performing aggressive disk cleanup before Stage 3 ..."
+        rm -rf "$BUILD_DIR/lto-cache" 2>/dev/null || true
+        rm -rf "$BUILD_DIR/profiles-stage2" 2>/dev/null || true
+        sudo apt-get clean 2>/dev/null || true
+        sudo rm -rf /var/lib/apt/lists/* /tmp/* 2>/dev/null || true
+        if command -v ccache &>/dev/null; then
+          ccache -c 2>/dev/null || true
+        fi
+        df -h / 2>/dev/null | tail -1 || true
+
         # ── Stage 3 (final) ──────────────────────────────────────────────────
         log "Available disk before Stage 3: $(df -h / | tail -1 | awk '{print $4}')"
-        check_disk_space 8000000 "Stage 3"
+        check_disk_space 6000000 "Stage 3"
         BUILD_STAGE="Stage 3: Final optimized build"
         export BUILD_STAGE
         stage_timer_start "stage3"
@@ -1283,11 +1339,8 @@ main() {
     } > "$metadata"
     log "Build metadata: $metadata"
 
-    # Capture LLVM commit info before deleting source tree
-    LLVM_COMMIT=$(git -C "$LLVM_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")
-    LLVM_COMMIT_FULL=$(git -C "$LLVM_DIR" rev-parse HEAD 2>/dev/null || echo "unknown")
-    LLVM_COMMIT_MSG=$(git -C "$LLVM_DIR" log -1 --format="%s" 2>/dev/null || echo "Automated build")
-    export LLVM_COMMIT LLVM_COMMIT_FULL LLVM_COMMIT_MSG
+    # LLVM commit info was saved before .git removal — ensure package.sh uses it
+    export LLVM_COMMIT LLVM_COMMIT_FULL
 
     # Final cleanup: remove LLVM source tree to free disk space for packaging
     log "Cleaning up LLVM source tree ..."
