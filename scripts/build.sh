@@ -792,98 +792,6 @@ stage2_build() {
   export PATH="$old_path"
 }
 
-# ─── Stage 3: Final Optimized Build (3-stage PGO) ────────────────────────────
-stage3_build() {
-  log "Stage 3: Final optimized build using Stage 2 Clang + refined PGO ..."
-  local s3_build="$BUILD_DIR/stage3"
-
-  local old_path="$PATH"
-  export PATH="$STAGE2_INSTALL/bin:$PATH"
-
-  local arch_flags="-march=native -mtune=native"
-
-  local saved_runtimes="$LLVM_RUNTIMES"
-  LLVM_RUNTIMES="libcxx;libcxxabi;libunwind"
-
-  cmake_configure "$LLVM_DIR" "$s3_build" "$INSTALL_DIR" "$LLVM_PROJECTS" "" \
-    -DCMAKE_C_COMPILER="$STAGE2_INSTALL/bin/clang" \
-    -DCMAKE_CXX_COMPILER="$STAGE2_INSTALL/bin/clang++" \
-    -DCMAKE_C_FLAGS="$arch_flags" \
-    -DCMAKE_CXX_FLAGS="$arch_flags" \
-    -DLLVM_ENABLE_LTO="$LTO_MODE" \
-    -DCOMPILER_RT_ENABLE_LTO=OFF \
-    -DLLVM_PROFDATA_FILE="${PGO_PROF_2:-}" \
-    -DLLVM_ENABLE_PLUGINS=ON \
-    -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
-    -DCOMPILER_RT_BUILD_XRAY=OFF \
-    -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
-    -DCOMPILER_RT_BUILD_PROFILE=OFF \
-    -DCOMPILER_RT_BUILD_CRT=OFF \
-    -DPOLLY_ENABLE_LOOP_EXTRACT=ON
-  LLVM_RUNTIMES="$saved_runtimes"
-
-  local old_ld_path="${LD_LIBRARY_PATH:-}"
-  export LD_LIBRARY_PATH="$s3_build/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-  cmake --build "$s3_build" -j"$JOBS" 2>&1 | tee -a "$BUILD_DIR/build.log"
-  export LD_LIBRARY_PATH="$old_ld_path"
-
-  log "Stage 3 build done. Cleaning object files + LTO cache before install ..."
-  find "$s3_build" -name "*.o" -delete 2>/dev/null || true
-  find "$s3_build" -name "*.obj" -delete 2>/dev/null || true
-  rm -rf "$BUILD_DIR/lto-cache" 2>/dev/null || true
-  sudo apt-get clean 2>/dev/null || true
-  sudo rm -rf /var/lib/apt/lists/* /tmp/* 2>/dev/null || true
-  df -h / 2>/dev/null | tail -1 || true
-
-  cmake --install "$s3_build" 2>&1 | tee -a "$BUILD_DIR/build.log"
-  bundle_libcxx "$s3_build"
-
-  log "Removing Stage 3 build directory ..."
-  rm -rf "$s3_build" 2>/dev/null || true
-  df -h / 2>/dev/null | tail -1 || true
-
-  export PATH="$old_path"
-}
-
-# ─── 3-Stage PGO Profile Collection ──────────────────────────────────────────
-collect_profiles_stage2() {
-  local workload="${PGO_WORKLOAD:-sqlite}"
-  log "Stage 2 PGO: collecting refined profiles using Stage 2 Clang ..."
-
-  local profile_dir="$BUILD_DIR/profiles-stage2"
-  mkdir -p "$profile_dir"
-
-  export LLVM_PROFILE_FILE="$profile_dir/oronyx-%p.profraw"
-  export STAGE1_CC="$STAGE2_INSTALL/bin/clang"
-  export STAGE1_CXX="$STAGE2_INSTALL/bin/clang++"
-  export STAGE1_INSTALL="$STAGE2_INSTALL"
-
-  if [[ "$workload" == "kernel" ]]; then
-    collect_kernel || collect_sqlite || return 1
-  elif [[ "$workload" == "llvm" ]]; then
-    collect_llvm || collect_sqlite || return 1
-  else
-    collect_sqlite || return 1
-  fi
-
-  local profiles=("$profile_dir"/*.profraw)
-  if [[ ${#profiles[@]} -eq 0 ]]; then
-    warn "Stage 2 PGO: no profiles generated."
-    return 1
-  fi
-
-  log "Merging Stage 2 PGO profiles ..."
-  local profdata_bin="$STAGE2_INSTALL/bin/llvm-profdata"
-  if ! "$profdata_bin" merge -output="$BUILD_DIR/pgo-stage2.prof" "${profiles[@]}"; then
-    warn "llvm-profdata merge failed for stage2 profiles"
-    return 1
-  fi
-
-  export PGO_PROF_2="$BUILD_DIR/pgo-stage2.prof"
-  rm -rf "$profile_dir"
-  log "Stage 2 PGO profile ready: $PGO_PROF_2"
-}
-
 # ─── BOLT Post-Build Optimization ────────────────────────────────────────────
 apply_bolt() {
   [[ "$ENABLE_BOLT" == "true" ]] || return 0
@@ -1217,46 +1125,23 @@ main() {
       fi
       df -h / 2>/dev/null | tail -1 || true
 
-      # ── Stage 2 (intermediate) ─────────────────────────────────────────────
+      # ── Stage 2 (final optimized build) ──────────────────────────────────────
       log "Available disk before Stage 2: $(df -h / | tail -1 | awk '{print $4}')"
       check_disk_space 6000000 "Stage 2"
-      BUILD_STAGE="Stage 2: Optimized build (intermediate)"
+      BUILD_STAGE="Stage 2: Final optimized build"
       export BUILD_STAGE
       stage_timer_start "stage2"
       export STAGE2_INSTALL="$BUILD_DIR/stage2-install"
       stage2_build "$STAGE2_INSTALL"
       stage_timer_end "stage2"
 
-      # ── Stage 2 PGO collection ─────────────────────────────────────────────
-      log "Available disk before Stage 2 PGO: $(df -h / | tail -1 | awk '{print $4}')"
-      BUILD_STAGE="PGO profile collection (2)"
-      export BUILD_STAGE
-      stage_timer_start "pgo_collect2"
-      if collect_profiles_stage2; then
-        stage_timer_end "pgo_collect2"
-
-        # ── Aggressive disk cleanup before Stage 3 ──────────────────────────
-        log "Performing aggressive disk cleanup before Stage 3 ..."
-        rm -rf "$BUILD_DIR/lto-cache" 2>/dev/null || true
-        rm -rf "$BUILD_DIR/profiles-stage2" 2>/dev/null || true
-        sudo apt-get clean 2>/dev/null || true
-        sudo rm -rf /var/lib/apt/lists/* /tmp/* 2>/dev/null || true
-        if command -v ccache &>/dev/null; then
-          ccache -c 2>/dev/null || true
-        fi
-        df -h / 2>/dev/null | tail -1 || true
-
-        # ── Stage 3 (final) ──────────────────────────────────────────────────
-        log "Available disk before Stage 3: $(df -h / | tail -1 | awk '{print $4}')"
-        check_disk_space 6000000 "Stage 3"
-        BUILD_STAGE="Stage 3: Final optimized build"
-        export BUILD_STAGE
-        stage_timer_start "stage3"
-        stage3_build
-        stage_timer_end "stage3"
-
-        # Cleanup stage2 install AFTER stage3 uses it
-        log "Cleaning Stage 2 install dir ..."
+      # ── Stage 2 is now the final build (2-stage PGO) ────────────────────────
+      log "Stage 2 build complete. Moving to final location ..."
+      if [[ -d "$STAGE2_INSTALL/bin" ]]; then
+        mkdir -p "$INSTALL_DIR"
+        for _d in "$STAGE2_INSTALL"/* "$STAGE2_INSTALL"/.[!.]*; do
+          [[ -e "$_d" ]] && mv "$_d" "$INSTALL_DIR/"
+        done
         rm -rf "$STAGE2_INSTALL" 2>/dev/null || true
         df -h / 2>/dev/null | tail -1 || true
 
@@ -1266,24 +1151,6 @@ main() {
         apply_bolt
         stage_timer_end "bolt"
         BUILD_SUCCESS=true
-      else
-        stage_timer_end "pgo_collect2"
-        warn "Stage 2 PGO collection failed. Falling back to Stage 2 build."
-        # Move stage2 install to final location
-        if [[ -d "$STAGE2_INSTALL/bin" ]]; then
-          log "Using Stage 2 build as final ..."
-          mkdir -p "$INSTALL_DIR"
-          for _d in "$STAGE2_INSTALL"/* "$STAGE2_INSTALL"/.[!.]*; do
-            [[ -e "$_d" ]] && mv "$_d" "$INSTALL_DIR/"
-          done
-          rm -rf "$STAGE2_INSTALL" 2>/dev/null || true
-          BUILD_STAGE="BOLT optimization"
-          export BUILD_STAGE
-          stage_timer_start "bolt"
-          apply_bolt
-          stage_timer_end "bolt"
-          BUILD_SUCCESS=true
-        fi
       fi
     else
       stage_timer_end "pgo_collect"
@@ -1334,7 +1201,7 @@ main() {
       echo "  \"duration\": \"$BUILD_DURATION\","
       echo "  \"stages\": {"
       local first=true
-      for key in clone patches stage1 pgo_collect stage2 pgo_collect2 stage3 bolt simple; do
+      for key in clone patches stage1 pgo_collect stage2 bolt simple; do
         if [[ -n "${STAGE_TIMES[$key]:-}" ]]; then
           [[ "$first" == "true" ]] || echo ","
           printf '    "%s": %d' "$key" "${STAGE_TIMES[$key]}"
