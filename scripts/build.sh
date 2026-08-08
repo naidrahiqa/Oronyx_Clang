@@ -292,6 +292,9 @@ prune_llvm_source() {
   done
   # llvm (core) + cmake utils are always required
   needed="$needed llvm cmake utils third-party runtimes"
+  # lld/MachO includes "mach-o/compact_unwind_encoding.h" which lives in
+  # libunwind/include — keep libunwind even when runtimes are disabled.
+  needed="$needed libunwind"
 
   log "Pruning unused LLVM subprojects ..."
   local freed=0
