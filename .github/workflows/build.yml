@@ -23,6 +23,9 @@ on:
       llvm_source:
         description: 'LLVM source: upstream (GitHub) or android (AOSP fork)'
         default: 'upstream'
+      preset:
+        description: 'Build preset: slim (free runner, fast), kernel (PGO+BOLT, needs big disk)'
+        default: 'slim'
       release:
         description: 'Publish to GitHub Releases'
         type: boolean
@@ -51,6 +54,8 @@ env:
   # Schedule builds track main branch (rolling); dispatch can override
   LLVM_BRANCH: ${{ github.event.inputs.llvm_branch || github.event.client_payload.llvm_branch || 'main' }}
   LLVM_SOURCE: ${{ github.event.inputs.llvm_source || 'upstream' }}
+  # Default PRESET=--slim for free runners; PGO/BOLT builds need a big disk
+  PRESET: ${{ github.event.inputs.preset || 'slim' }}
   ENABLE_PGO: ${{ github.event.inputs.enable_pgo || 'false' }}
   ENABLE_BOLT: ${{ github.event.inputs.enable_bolt || 'false' }}
   PGO_WORKLOAD: ${{ github.event.inputs.pgo_workload || 'sqlite' }}

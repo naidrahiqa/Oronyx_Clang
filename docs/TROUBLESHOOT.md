@@ -110,6 +110,16 @@ bash scripts/kernel-build.sh <kernel-dir> --lto=off
 
 ## CI/CD Issues
 
+### Build fails with "No space left on device" (free runner)
+
+**Cause:** Free GitHub runner disk (14 GB) is exhausted by PGO+BOLT builds. `config/build.conf` used to force `PRESET="kernel"` (PGO+BOLT) which ignored workflow inputs — now overridable.
+
+**Solution:**
+- Use the `slim` preset for free runners (default in CI): no PGO/BOLT, fits in 14 GB
+- `build.sh` prunes unused LLVM subprojects (mlir/flang/lldb/etc.) after clone — ~1-2 GB freed
+- Use the `kernel`/`full` presets only on runners with large disk (self-hosted or GitHub large runner)
+- Manual dispatch: set `preset` input to `slim`
+
 ### Build timeout
 
 **Cause:** PGO build takes 3+ hours on GitHub Actions.
@@ -118,6 +128,7 @@ bash scripts/kernel-build.sh <kernel-dir> --lto=off
 - Build timeout is set to 6 hours
 - Use `ENABLE_PGO=false` for faster testing
 - Check if disk cleanup is working
+- Use `slim` preset (skips PGO stage entirely)
 
 ### Release not publishing
 

@@ -6,7 +6,24 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Telegram notifications for multi-version builds** — `build-multi.yml` now sends build notifications via `scripts/notify.sh` for all lifecycles:
+  - `started` — build kicked off per LLVM version
+  - `success` — build + packaging complete
+  - `release` — release published (only when the `release` input is enabled)
+  - `failure` — build failed with stage/error context
+  - Requires `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` repository secrets
+
 ### Fixed
+
+- **CI disk exhaustion on free runners** — `config/build.conf` forced `PRESET="kernel"` unconditionally, which re-enabled PGO+BOLT even when workflow inputs disabled them, blowing past the ~14 GB free runner disk. Now:
+  - `PRESET` is overridable via environment (`PRESET="${PRESET:-kernel}"`)
+  - `build.yml` and `build-multi.yml` default the preset input to `slim` (no PGO/BOLT) so free-hosted builds fit in disk
+  - Choose `kernel` preset manually only for machines with large disk
+  - CI builds previously failed with `No space left on device` after ~2.5-5h
+- **Disk footprint of LLVM source tree** — `build.sh` now prunes unused LLVM subprojects (`mlir`, `flang`, `lldb`, `openmp`, `libc`, `bolt`, `polly`, `libclc`, etc.) right after patch application, freeing ~1-2 GB per build
+- **Optional build dependencies** — `cmake_configure()` disables `LIBXML2`, `TERMINFO`, `ZLIB`, `BACKTRACES`, and `FFI` (unused optional deps) to shrink build dir, speed configure, and reduce link risk on constrained runners
 
 - **Runtimes configure failure in Stage 1** — `LIBCXXABI_USE_LLVM_UNWINDER is set to ON, but libunwind is not specified in LLVM_ENABLE_RUNTIMES` when presets (`kernel`, `full`) set `LLVM_RUNTIMES="libcxx;libcxxabi"` without `libunwind`. Stage 1 no longer builds runtimes at all (`LLVM_RUNTIMES=""`) — it is only used for PGO profile collection and its artifacts are deleted afterwards. Final runtimes (with `libunwind`) are built in Stage 2/3.
 - **Preset consistency** — `config/presets/kernel.conf` and `config/presets/full.conf` now set `LLVM_RUNTIMES="libcxx;libcxxabi;libunwind"` to match what Stage 2/3 actually build.

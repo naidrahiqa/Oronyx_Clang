@@ -5,15 +5,19 @@
 ## Struktur
 
 ```
+```
 oronyx-clang/
 ├── .github/workflows/
 │   ├── build.yml              # Main build pipeline (build + package + release)
+│   ├── build-multi.yml        # Multi-version build (manual dispatch, matrix)
+│   ├── check-llvm-update.yml  # Cek LLVM release baru otomatis
+│   ├── lint.yml               # ShellCheck lint
 │   └── sync-patches.yml       # Auto-sync LLVM patches
 ├── scripts/
 │   ├── build.sh               # Core 2-stage PGO+ThinLTO build
 │   ├── patch.sh               # Apply patches with fallback
 │   ├── package.sh             # Compress + generate manifest
-│   ├── notify.sh              # Telegram notifications
+│   ├── notify.sh              # Telegram notifications (started/success/failure/release/changelog)
 │   ├── sync-patches.sh        # Auto-find LLVM stable commits
 │   ├── kernel-lto.sh          # Kernel ThinLTO env setup
 │   └── check-compat.sh        # Toolchain compatibility check
@@ -29,6 +33,7 @@ oronyx-clang/
 
 | Flag | Default | Deskripsi |
 |------|---------|-----------|
+| `PRESET` | `kernel` | Build preset: `kernel` (PGO+BOLT), `full`, `slim` (tanpa PGO/BOLT) |
 | `LLVM_BRANCH` | `llvmorg-22.1.0` | LLVM branch/tag |
 | `ENABLE_PGO` | `true` | 2-stage PGO build |
 | `ENABLE_BOLT` | `true` | BOLT post-build optimization |

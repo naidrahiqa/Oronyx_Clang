@@ -15,6 +15,9 @@ on:
         description: 'Enable BOLT optimization'
         type: boolean
         default: false
+      preset:
+        description: 'Build preset: slim (free runner, fast), kernel (PGO+BOLT, needs big disk)'
+        default: 'slim'
       release:
         description: 'Publish to GitHub Releases'
         type: boolean
@@ -118,9 +121,22 @@ jobs:
             ${{ runner.os }}-ccache-${{ matrix.llvm_version }}-
             ${{ runner.os }}-ccache-
 
+      - name: Count patches
+        run: echo "PATCH_COUNT=$(ls -1 patches/*.patch 2>/dev/null | wc -l)" >> "$GITHUB_ENV"
+
+      - name: Notify build started
+        env:
+          LLVM_BRANCH: ${{ steps.version.outputs.llvm_branch }}
+          ENABLE_PGO: ${{ inputs.enable_pgo }}
+          ENABLE_BOLT: ${{ inputs.enable_bolt }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: bash scripts/notify.sh started
+
       - name: Run build
         env:
           LLVM_BRANCH: ${{ steps.version.outputs.llvm_branch }}
+          PRESET: ${{ inputs.preset }}
           ENABLE_PGO: ${{ inputs.enable_pgo }}
           ENABLE_BOLT: ${{ inputs.enable_bolt }}
           ZSTD_LEVEL: 10
@@ -185,3 +201,33 @@ jobs:
               "$TARBALL" \
               "$OUTPUT_DIR/clang-version.txt"
           }
+
+      - name: Notify build success
+        if: success()
+        env:
+          CLANG_VERSION: ${{ steps.package.outputs.CLANG_VERSION }}
+          RELEASE_TAG: ${{ matrix.llvm_version }}
+          LLVM_BRANCH: ${{ steps.version.outputs.llvm_branch }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: bash scripts/notify.sh success
+
+      - name: Notify release
+        if: inputs.release == true && success()
+        env:
+          RELEASE_TAG: ${{ matrix.llvm_version }}
+          CLANG_VERSION: ${{ steps.package.outputs.CLANG_VERSION }}
+          TARBALL_NAME: ${{ env.TARBALL_NAME }}
+          PACKAGE_SIZE: ${{ env.PACKAGE_SIZE }}
+          SHA256: ${{ env.SHA256 }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: bash scripts/notify.sh release
+
+      - name: Notify build failure
+        if: failure()
+        env:
+          LLVM_BRANCH: ${{ steps.version.outputs.llvm_branch }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: bash scripts/notify.sh failure

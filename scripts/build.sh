@@ -17,6 +17,7 @@ ZSTD_LEVEL="${ZSTD_LEVEL:-10}"
 PRESET="${PRESET:-}"
 
 # Load build preset if specified
+# PRESET can come from environment (CI) and defaults to "kernel" via build.conf
 CONFIG_FILE="$(cd "$(dirname "$0")/.." && pwd)/config/build.conf"
 if [[ -f "$CONFIG_FILE" ]]; then
   # shellcheck source=/dev/null
@@ -267,6 +268,52 @@ apply_patches() {
   bash "$SCRIPT_DIR/patch.sh" "$LLVM_DIR"
 }
 
+# ─── Prune unused LLVM subprojects ────────────────────────────────────────────
+# llvm-project ships mlir/flang/lldb/openmp/libc/bolt/polly/etc (~1-2 GB) that
+# are never built here. Removing them right after patches (and before configure)
+# keeps disk usage low enough for the free GitHub runner (14 GB).
+prune_llvm_source() {
+  local needed=""
+  for p in ${LLVM_PROJECTS//;/ }; do
+    case "$p" in
+      clang) needed="$needed clang clang-tools-extra" ;;
+      lld) needed="$needed lld" ;;
+      compiler-rt) needed="$needed compiler-rt" ;;
+      polly) needed="$needed polly" ;;
+    esac
+  done
+  # Runtimes are optionally built via LLVM_RUNTIMES
+  for r in ${LLVM_RUNTIMES//;/ }; do
+    case "$r" in
+      libcxx) needed="$needed libcxx" ;;
+      libcxxabi) needed="$needed libcxxabi" ;;
+      libunwind) needed="$needed libunwind" ;;
+    esac
+  done
+  # llvm (core) + cmake utils are always required
+  needed="$needed llvm cmake utils third-party runtimes"
+
+  log "Pruning unused LLVM subprojects ..."
+  local freed=0
+  for d in "$LLVM_DIR"/*/; do
+    [[ -d "$d" ]] || continue
+    local base; base=$(basename "$d")
+    case " $needed " in
+      *" $base "*) : ;; # keep
+      *)
+        local sz; sz=$(du -sm "$d" 2>/dev/null | cut -f1)
+        if [[ "$sz" =~ ^[0-9]+$ ]]; then
+          freed=$((freed + sz))
+        fi
+        rm -rf "$d"
+        log "  removed: $base (~${sz} MB)"
+        ;;
+    esac
+  done
+  log "Pruned ~${freed} MB of unused LLVM sources"
+  df -h / 2>/dev/null | tail -1 || true
+}
+
 # ─── CMake Configure Helper ───────────────────────────────────────────────────
 cmake_configure() {
   local src="$1" build="$2" install="$3" projects="$4" targets="${5:-$LLVM_TARGETS}"
@@ -286,6 +333,13 @@ cmake_configure() {
 
   # Disable gold plugin build (not needed; we use LLD for ThinLTO)
   cmake_extra_args+=("-DLLVM_BINUTILS_INCDIR=")
+
+  # Skip optional deps we don't use — smaller build dir, faster config, less risk
+  cmake_extra_args+=("-DLLVM_ENABLE_LIBXML2=OFF")
+  cmake_extra_args+=("-DLLVM_ENABLE_TERMINFO=OFF")
+  cmake_extra_args+=("-DLLVM_ENABLE_ZLIB=OFF")
+  cmake_extra_args+=("-DLLVM_ENABLE_BACKTRACES=OFF")
+  cmake_extra_args+=("-DLLVM_ENABLE_FFI=OFF")
 
   # Enable ccache if available (aggressive mode for faster rebuilds)
   if command -v ccache &>/dev/null; then
@@ -1089,6 +1143,8 @@ main() {
   rm -rf "$LLVM_DIR/.git" 2>/dev/null || true
   log "Removed LLVM .git directory"
   df -h / 2>/dev/null | tail -1 || true
+
+  prune_llvm_source
 
   BUILD_SUCCESS=false
   if [[ "$ENABLE_PGO" == "true" ]]; then
