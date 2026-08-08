@@ -42,6 +42,7 @@ on:
     paths:
       - 'patches/**'
       - 'scripts/**'
+      - 'config/**'
       - '.github/workflows/**'
 
 permissions:
